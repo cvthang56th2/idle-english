@@ -13,7 +13,12 @@ export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     const demoMap = new Map(DEMO_LESSON_CARDS.map((c) => [c.id, c]));
     const items = ids
-      .map((id) => demoMap.get(id))
+      .map((id) => {
+        const direct = demoMap.get(id);
+        if (direct) return direct;
+        const legacy = id.replace(/:\d+$/, "");
+        return demoMap.get(legacy);
+      })
       .filter(Boolean) as typeof DEMO_LESSON_CARDS;
     return Response.json({ items });
   }

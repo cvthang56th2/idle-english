@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (!isSupabaseConfigured()) {
     const items = Array.from({ length: limit }, (_, i) => {
       const card = DEMO_LESSON_CARDS[(offset + i) % DEMO_LESSON_CARDS.length];
-      return { ...card, id: `${card.id}:${offset + i}` };
+      return { ...card };
     });
     return Response.json({
       items,
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   if (!supabase) {
     const items = Array.from({ length: limit }, (_, i) => {
       const card = DEMO_LESSON_CARDS[(offset + i) % DEMO_LESSON_CARDS.length];
-      return { ...card, id: `${card.id}:${offset + i}` };
+      return { ...card };
     });
     return Response.json({ items, nextOffset: offset + limit });
   }
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
   if (error || !data?.length) {
     const items = Array.from({ length: limit }, (_, i) => {
       const card = DEMO_LESSON_CARDS[(offset + i) % DEMO_LESSON_CARDS.length];
-      return { ...card, id: `${card.id}:${offset + i}` };
+      return { ...card };
     });
     return Response.json({ items, nextOffset: offset + limit });
   }

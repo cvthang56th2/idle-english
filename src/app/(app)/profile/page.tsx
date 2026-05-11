@@ -1,6 +1,7 @@
 import { fetchProgress } from "@/app/actions/progress";
 import { AppHeader } from "@/components/layout/app-header";
 import { ProfileDashboard } from "@/components/profile/profile-dashboard";
+import { getAuthSyncSummary } from "@/lib/auth-sync";
 
 export const metadata = {
   title: "Profile · IdleEnglish",
@@ -8,7 +9,10 @@ export const metadata = {
 };
 
 export default async function ProfilePage() {
-  const progress = await fetchProgress();
+  const [progress, authSync] = await Promise.all([
+    fetchProgress(),
+    getAuthSyncSummary(),
+  ]);
 
   return (
     <main className="flex flex-1 flex-col">
@@ -21,6 +25,7 @@ export default async function ProfilePage() {
         remoteXp={progress.xp}
         remoteStreak={progress.streak}
         lastLearnedAt={progress.lastLearnedAt}
+        authSync={authSync}
       />
     </main>
   );

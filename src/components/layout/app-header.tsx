@@ -4,10 +4,12 @@ export function AppHeader({
   eyebrow,
   title,
   detail,
+  showFeedShortcut = true,
 }: {
   eyebrow: string;
   title: string;
   detail?: string;
+  showFeedShortcut?: boolean;
 }) {
   return (
     <header className="space-y-1 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
@@ -21,12 +23,14 @@ export function AppHeader({
             <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
           ) : null}
         </div>
-        <Link
-          href="/feed"
-          className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-        >
-          Feed
-        </Link>
+        {showFeedShortcut ? (
+          <Link
+            href="/feed"
+            className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            Feed
+          </Link>
+        ) : null}
       </div>
     </header>
   );

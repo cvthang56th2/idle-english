@@ -16,6 +16,7 @@ export default async function FeedPage() {
         eyebrow="IdleEnglish"
         title="Learn in the gaps"
         detail="Vertical micro-lessons · swipe up"
+        showFeedShortcut={false}
       />
       <SwipeFeed initialSavedIds={savedIds} />
     </main>

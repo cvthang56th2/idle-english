@@ -1,9 +1,10 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { Cloud, CloudOff, Download, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { AuthSyncSummary } from "@/lib/auth-sync";
 import { readLocalProgress } from "@/lib/offline-cache";
 
 type BeforeInstallPromptEvent = Event & {
@@ -11,14 +12,57 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+function syncCopy(summary: AuthSyncSummary): {
+  title: string;
+  body: string;
+  icon: typeof Cloud;
+} {
+  switch (summary.state) {
+    case "unconfigured":
+      return {
+        title: "Cloud backup off",
+        body: "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, and enable Anonymous sign-ins in Supabase, to sync saves and XP.",
+        icon: CloudOff,
+      };
+    case "no_client":
+      return {
+        title: "Could not reach auth",
+        body: "Progress stays on this device until the auth service responds.",
+        icon: CloudOff,
+      };
+    case "no_user":
+      return {
+        title: "Signing you in…",
+        body: "We open an anonymous session on load. If this stays stuck, refresh once.",
+        icon: Cloud,
+      };
+    case "anonymous":
+      return {
+        title: "Guest cloud session",
+        body: "XP and saved cards sync to Supabase for this browser session. Link an email in the Supabase dashboard later if you add full auth.",
+        icon: Cloud,
+      };
+    case "signed_in":
+      return {
+        title: "Account",
+        body: summary.email
+          ? `${summary.email} — progress syncs with this account.`
+          : "You’re logged in — progress syncs when you’re online.",
+        icon: User,
+      };
+  }
+}
+
 export function ProfileDashboard({
   remoteXp,
   remoteStreak,
   lastLearnedAt,
+  authSync,
 }: {
   remoteXp: number;
   remoteStreak: number;
   lastLearnedAt: string | null;
+  authSync: AuthSyncSummary;
 }) {
   const [installEvent, setInstallEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -41,6 +85,8 @@ export function ProfileDashboard({
 
   const xp = Math.max(remoteXp, local.xp);
   const streak = Math.max(remoteStreak, local.streak);
+  const sync = syncCopy(authSync);
+  const SyncIcon = sync.icon;
 
   async function handleInstall() {
     if (!installEvent) return;
@@ -81,6 +127,20 @@ export function ProfileDashboard({
             })}
           </p>
         ) : null}
+      </section>
+
+      <section className="rounded-[26px] border border-border/70 bg-card/50 p-6 backdrop-blur-md">
+        <div className="flex gap-4">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+            <SyncIcon className="size-5" aria-hidden />
+          </div>
+          <div>
+            <p className="text-lg font-semibold leading-snug">{sync.title}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {sync.body}
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="rounded-[26px] border border-dashed border-primary/40 bg-primary/5 p-6">
