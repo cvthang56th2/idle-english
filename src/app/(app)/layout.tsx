@@ -8,8 +8,8 @@ export default function AppShellLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-lg flex-col bg-background">
-      <div className="flex flex-1 flex-col pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
+    <div className="relative mx-auto flex h-dvh min-h-0 w-full max-w-lg flex-col overflow-hidden bg-background">
+      <div className="flex min-h-0 flex-1 flex-col pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
         {children}
       </div>
       <BottomNav />

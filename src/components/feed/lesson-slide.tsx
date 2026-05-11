@@ -70,11 +70,11 @@ export function LessonSlide({
       initial={{ opacity: 0.9, scale: 0.987 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.55 }}
-      className="flex h-[calc(100dvh-5.5rem)] max-h-[calc(100dvh-5.5rem)] flex-col gap-4 rounded-[28px] border border-border/70 bg-gradient-to-b from-card/90 to-background/80 p-5 pb-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-white/5 backdrop-blur-md supports-[height:100dvh]:h-[calc(100dvh-5.5rem)]"
+      className="flex h-full min-h-0 max-h-full flex-col gap-4 rounded-[28px] border border-border/70 bg-gradient-to-b from-card/90 to-background/80 p-5 pb-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-white/5 backdrop-blur-md"
     >
       <LessonCardHeader card={card} />
-      <LessonCardBody card={card} />
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
+      <LessonCardBody card={card} className="min-h-0 overflow-y-auto" />
+      <div className="mt-auto flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"

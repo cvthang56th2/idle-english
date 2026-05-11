@@ -32,11 +32,17 @@ export function LessonCardHeader({ card }: { card: LessonCard }) {
   );
 }
 
-export function LessonCardBody({ card }: { card: LessonCard }) {
+export function LessonCardBody({
+  card,
+  className,
+}: {
+  card: LessonCard;
+  className?: string;
+}) {
   const c = card.content;
 
   return (
-    <div className="flex flex-1 flex-col gap-5 px-1">
+    <div className={cn("flex min-h-0 flex-1 flex-col gap-5 px-1", className)}>
       <h1 className="text-balance text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
         {card.title}
       </h1>

@@ -15,7 +15,7 @@ export default async function ProfilePage() {
   ]);
 
   return (
-    <main className="flex flex-1 flex-col">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <AppHeader
         eyebrow="Progress"
         title="Profile"

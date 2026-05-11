@@ -96,7 +96,7 @@ export function ProfileDashboard({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 px-4 pb-8">
+    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pb-8">
       <section className="grid gap-4">
         <div className="rounded-[26px] border border-border/70 bg-gradient-to-br from-emerald-500/15 via-card to-background p-6 shadow-[0_22px_70px_rgba(0,0,0,0.35)]">
           <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">

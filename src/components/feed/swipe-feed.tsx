@@ -193,9 +193,8 @@ export function SwipeFeed({
     <>
       <div
         ref={containerRef}
-        className="snap-y snap-mandatory overflow-y-scroll overscroll-y-contain"
+        className="min-h-0 flex-1 snap-y snap-mandatory overflow-y-scroll overscroll-y-contain"
         style={{
-          height: "calc(100dvh - 5.5rem)",
           scrollSnapStop: "always",
           WebkitOverflowScrolling: "touch",
         }}
@@ -205,8 +204,7 @@ export function SwipeFeed({
             key={`${card.id}-${index}`}
             data-feed-slide
             data-card-id={`${card.id}-${index}`}
-            className="snap-start snap-always px-3 pt-3"
-            style={{ minHeight: "calc(100dvh - 5.5rem)" }}
+            className="box-border flex h-full shrink-0 snap-start snap-always flex-col px-3 pt-3"
           >
             <LessonSlide
               card={card}
@@ -218,7 +216,7 @@ export function SwipeFeed({
         ))}
         <div
           ref={sentinelRef}
-          className="snap-start px-3 pt-3"
+          className="shrink-0 snap-start px-3 pt-3"
           style={{ minHeight: "40vh" }}
         >
           <div className="flex flex-col gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/30 p-6 text-center text-sm text-muted-foreground">
