@@ -15,6 +15,15 @@ export function LearnFeedShell({
   initialSavedIds: string[];
 }) {
   const [tab, setTab] = useState<LearnTab>("cards");
+  /** Remount swipe feed when returning from News so Cards opens with a freshly fetched deck. */
+  const [cardsFeedKey, setCardsFeedKey] = useState(0);
+
+  const selectTab = (next: LearnTab) => {
+    if (next === "cards" && tab === "news") {
+      setCardsFeedKey((k) => k + 1);
+    }
+    setTab(next);
+  };
 
   return (
     <>
@@ -37,7 +46,7 @@ export function LearnFeedShell({
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
-            onClick={() => setTab("cards")}
+            onClick={() => selectTab("cards")}
           >
             Cards
           </button>
@@ -54,7 +63,7 @@ export function LearnFeedShell({
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground",
             )}
-            onClick={() => setTab("news")}
+            onClick={() => selectTab("news")}
           >
             News
           </button>
@@ -70,7 +79,10 @@ export function LearnFeedShell({
           tab !== "cards" && "hidden",
         )}
       >
-        <SwipeFeed initialSavedIds={initialSavedIds} />
+        <SwipeFeed
+          key={cardsFeedKey}
+          initialSavedIds={initialSavedIds}
+        />
       </div>
 
       <div

@@ -6,6 +6,13 @@ import { toast } from "sonner";
 
 import { CARD_CATEGORIES, type CardCategoryId } from "@/data/card-categories";
 import type { LearnerLevel, LessonCard } from "@/types/card";
+import {
+  LS_GENERATE_CATEGORIES,
+  LS_GENERATE_LEVEL,
+  LS_GENERATE_NOTES,
+  NOTES_MAX,
+  readGenerateSessionPrefs,
+} from "@/lib/generate-session-prefs";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -17,52 +24,12 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-const LS_CATEGORIES = "idle_generate_categories_v1";
-const LS_LEVEL = "idle_generate_level_v1";
-const LS_NOTES = "idle_generate_notes_v1";
-
-const NOTES_MAX = 500;
-
 const LEVELS: LearnerLevel[] = ["beginner", "intermediate", "advanced"];
 
 type FeedGenResponse = {
   items?: LessonCard[];
   error?: string;
 };
-
-function readStoredCategories(): CardCategoryId[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(LS_CATEGORIES);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return null;
-    const allowed = new Set(CARD_CATEGORIES.map((c) => c.id));
-    return parsed.filter(
-      (id): id is CardCategoryId => typeof id === "string" && allowed.has(id as CardCategoryId),
-    );
-  } catch {
-    return null;
-  }
-}
-
-function readStoredLevel(): LearnerLevel | null {
-  if (typeof window === "undefined") return null;
-  const v = window.localStorage.getItem(LS_LEVEL);
-  if (v && (LEVELS as string[]).includes(v)) return v as LearnerLevel;
-  return null;
-}
-
-function readStoredNotes(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const v = window.localStorage.getItem(LS_NOTES);
-    if (typeof v !== "string") return "";
-    return v.slice(0, NOTES_MAX);
-  } catch {
-    return "";
-  }
-}
 
 type GenerateSessionSheetProps = {
   open: boolean;
@@ -76,40 +43,44 @@ export function GenerateSessionSheet({
   onGenerated,
 }: GenerateSessionSheetProps) {
   const [selected, setSelected] = useState<Set<CardCategoryId>>(() => {
-    const stored = readStoredCategories();
-    if (stored?.length) return new Set(stored);
-    return new Set<CardCategoryId>(["fluent_dev_daily", "behavioral_interviews"]);
+    const { categoryIds } = readGenerateSessionPrefs();
+    return new Set(categoryIds);
   });
-  const [level, setLevel] = useState<LearnerLevel>(() => readStoredLevel() ?? "intermediate");
-  const [notes, setNotes] = useState<string>(() => readStoredNotes());
+  const [level, setLevel] = useState<LearnerLevel>(
+    () => readGenerateSessionPrefs().level,
+  );
+  const [notes, setNotes] = useState<string>(() => readGenerateSessionPrefs().notes);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      const storedCats = readStoredCategories();
-      if (storedCats?.length) {
-        setSelected(new Set(storedCats));
-      }
-      const storedLevel = readStoredLevel();
-      if (storedLevel) setLevel(storedLevel);
-      setNotes(readStoredNotes());
+      const prefs = readGenerateSessionPrefs();
+      setSelected(new Set(prefs.categoryIds));
+      setLevel(prefs.level);
+      setNotes(prefs.notes);
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
 
   const persistCategories = useCallback((next: Set<CardCategoryId>) => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(LS_CATEGORIES, JSON.stringify([...next]));
+    window.localStorage.setItem(
+      LS_GENERATE_CATEGORIES,
+      JSON.stringify([...next]),
+    );
   }, []);
 
   const persistLevel = useCallback((next: LearnerLevel) => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(LS_LEVEL, next);
+    window.localStorage.setItem(LS_GENERATE_LEVEL, next);
   }, []);
 
   const persistNotes = useCallback((next: string) => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(LS_NOTES, next.slice(0, NOTES_MAX));
+    window.localStorage.setItem(
+      LS_GENERATE_NOTES,
+      next.slice(0, NOTES_MAX),
+    );
   }, []);
 
   const toggle = useCallback(

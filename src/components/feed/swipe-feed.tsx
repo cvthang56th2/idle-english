@@ -11,6 +11,7 @@ import { Layers, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import type { LessonCard } from "@/types/card";
+import { readGenerateSessionPrefs } from "@/lib/generate-session-prefs";
 import { pingLearnSession } from "@/app/actions/progress";
 import {
   bumpLocalProgress,
@@ -42,6 +43,11 @@ import { cn } from "@/lib/utils";
 type FeedResponse = {
   items: LessonCard[];
   nextOffset: number;
+};
+
+type FeedGenResponse = {
+  items?: LessonCard[];
+  error?: string;
 };
 
 export function SwipeFeed({
@@ -89,45 +95,139 @@ export function SwipeFeed({
       window.removeEventListener(IDLE_SAVED_ENTRIES_CHANGED, handler);
   }, []);
 
+  const applyOfflineFallback = useCallback(() => {
+    const cached = readRecentCards();
+    if (cached?.length) {
+      setCards((prev) => (prev.length ? prev : cached));
+      toast.message("You’re offline — replaying cached lessons.");
+    } else {
+      toast.error("Could not load lessons. Check your connection.");
+    }
+  }, []);
+
+  const fetchCuratedAppend = useCallback(async (nextOffset: number) => {
+    const res = await fetch(`/api/cards?offset=${nextOffset}&limit=8`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) throw new Error("bad response");
+    const data = (await res.json()) as FeedResponse;
+    setCards((prev) => [...prev, ...data.items]);
+    setOffset(data.nextOffset);
+  }, []);
+
   const fetchPage = useCallback(async (nextOffset: number) => {
     if (loadingMoreRef.current) return;
     loadingMoreRef.current = true;
     setLoading(true);
     try {
-      const res = await fetch(`/api/cards?offset=${nextOffset}&limit=8`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (!res.ok) throw new Error("bad response");
-      const data = (await res.json()) as FeedResponse;
-      setCards((prev) => [...prev, ...data.items]);
-      setOffset(data.nextOffset);
+      await fetchCuratedAppend(nextOffset);
     } catch {
-      const cached = readRecentCards();
-      if (cached?.length) {
-        setCards((prev) => (prev.length ? prev : cached));
-        toast.message("You’re offline — replaying cached lessons.");
-      } else {
-        toast.error("Could not load lessons. Check your connection.");
-      }
+      applyOfflineFallback();
     } finally {
       loadingMoreRef.current = false;
       setLoading(false);
       setInitialLoading(false);
     }
+  }, [applyOfflineFallback, fetchCuratedAppend]);
+
+  const tryAppendAiBatch = useCallback(async (): Promise<boolean> => {
+    try {
+      const prefs = readGenerateSessionPrefs();
+      const res = await fetch("/api/cards/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryIds: prefs.categoryIds,
+          level: prefs.level,
+          count: 8,
+          notes: prefs.notes.trim() || undefined,
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      const data = (await res.json()) as FeedGenResponse;
+      const batch = data.items;
+      if (res.ok && batch?.length) {
+        const currentScrollTop = containerRef.current?.scrollTop;
+        setCards((prev) => [...prev, ...batch]);
+        setTimeout(() => {
+          if (containerRef.current) {
+            containerRef.current.scrollTo({ top: currentScrollTop });
+          }
+        }, 100);
+        return true;
+      }
+    } catch {
+      /* fall through to curated */
+    }
+    return false;
   }, []);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoading(true);
+    try {
+      const aiOk = await tryAppendAiBatch();
+      if (!aiOk) {
+        await fetchCuratedAppend(offsetRef.current);
+      }
+    } catch {
+      applyOfflineFallback();
+    } finally {
+      loadingMoreRef.current = false;
+      setLoading(false);
+      setInitialLoading(false);
+    }
+  }, [applyOfflineFallback, fetchCuratedAppend, tryAppendAiBatch]);
+
+  const showInitialSkeleton = initialLoading && cards.length === 0;
+
+  const loadInitialDeck = useCallback(async () => {
+    setLoading(true);
+    let aiLoaded = false;
+    try {
+      const prefs = readGenerateSessionPrefs();
+      const res = await fetch("/api/cards/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryIds: prefs.categoryIds,
+          level: prefs.level,
+          count: 8,
+          notes: prefs.notes.trim() || undefined,
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
+      const data = (await res.json()) as FeedGenResponse;
+      if (res.ok && data.items?.length) {
+        setCards(data.items);
+        setOffset(0);
+        aiLoaded = true;
+      }
+    } catch {
+      /* fall through to curated feed */
+    }
+    if (!aiLoaded) {
+      await fetchPage(0);
+    } else {
+      setLoading(false);
+      setInitialLoading(false);
+    }
+  }, [fetchPage]);
 
   useEffect(() => {
     startTransition(() => {
-      void fetchPage(0);
+      void loadInitialDeck();
     });
-  }, [fetchPage]);
+  }, [loadInitialDeck]);
 
   useEffect(() => {
     persistRecentCards(cards);
   }, [cards]);
 
   useEffect(() => {
+    if (showInitialSkeleton) return;
     const root = containerRef.current;
     const target = sentinelRef.current;
     if (!root || !target) return;
@@ -139,14 +239,14 @@ export function SwipeFeed({
         if (loadingMoreRef.current) return;
         if (Date.now() < cooldownUntilRef.current) return;
         cooldownUntilRef.current = Date.now() + 1100;
-        void fetchPage(offsetRef.current);
+        void loadMore();
       },
       { root, threshold: 0.15 },
     );
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [fetchPage]);
+  }, [loadMore, showInitialSkeleton]);
 
   const openExplainSheet = useCallback((card: LessonCard) => {
     setExplainTarget(card);
@@ -232,8 +332,6 @@ export function SwipeFeed({
     });
   }, []);
 
-  const showInitialSkeleton = initialLoading && cards.length === 0;
-
   return (
     <>
       <Button
@@ -294,7 +392,10 @@ export function SwipeFeed({
                     <Skeleton className="mx-auto h-4 w-56 rounded-full" />
                   </>
                 ) : (
-                  <p>Keep swiping — more micro-lessons incoming.</p>
+                  <p>
+                    Keep swiping — we&apos;ll generate more cards, or fall back
+                    to the curated deck if needed.
+                  </p>
                 )}
               </div>
             </div>
