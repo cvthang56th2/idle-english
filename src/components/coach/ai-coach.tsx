@@ -261,7 +261,9 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     setThreads((prev) => trimThreads([t, ...prev]));
     setActiveThreadId(t.id);
     setTopicLevelOpen(true);
-    toast.message("New conversation");
+    toast.message("New conversation", {
+      position: "bottom-right",
+    });
   }, [stopVoiceUi]);
 
   const deleteThread = useCallback(
@@ -726,12 +728,12 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 pb-2 pt-1">
       <div className="flex shrink-0 flex-col gap-2">
         <div className="-mx-1 flex max-h-[92px] min-h-0 flex-col gap-1 overflow-hidden">
-          <div className="flex gap-2 items-center overflow-x-auto pb-1 [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-2 items-center overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: "touch" }}>
             <Button
               type="button"
               variant="outline"
               size="xs"
-              className="ml-auto shrink-0 gap-1"
+              className="shrink-0 gap-1"
               onClick={startNewConversation}
             >
               <Plus className="size-3.5" aria-hidden />
@@ -748,6 +750,8 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
                       ? "border-primary bg-primary/12"
                       : "border-border bg-muted/25 hover:bg-muted/45",
                   )}
+                  // Ensure flex x min width so scrolling is always possible
+                  style={{ minWidth: "0" }}
                 >
                   <button
                     type="button"
@@ -770,6 +774,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
               );
             })}
           </div>
+
         </div>
       </div>
 
