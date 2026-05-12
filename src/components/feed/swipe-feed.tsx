@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Layers } from "lucide-react";
 import { toast } from "sonner";
 
 import type { LessonCard } from "@/types/card";
@@ -17,6 +18,7 @@ import {
   readRecentCards,
 } from "@/lib/offline-cache";
 import { LessonSlide } from "@/components/feed/lesson-slide";
+import { GenerateSessionSheet } from "@/components/feed/generate-session-sheet";
 import { FeedSkeleton } from "@/components/feed/feed-skeleton";
 import {
   Sheet,
@@ -27,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 type FeedResponse = {
   items: LessonCard[];
@@ -49,6 +52,7 @@ export function SwipeFeed({
   const [explainTarget, setExplainTarget] = useState<LessonCard | null>(null);
   const [explainText, setExplainText] = useState<string>("");
   const [explainLoading, setExplainLoading] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -185,78 +189,109 @@ export function SwipeFeed({
     });
   }, []);
 
-  if (initialLoading && cards.length === 0) {
-    return <FeedSkeleton />;
-  }
+  const prependGenerated = useCallback((incoming: LessonCard[]) => {
+    if (!incoming.length) return;
+    setCards((prev) => [...incoming, ...prev]);
+    requestAnimationFrame(() => {
+      containerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, []);
+
+  const showInitialSkeleton = initialLoading && cards.length === 0;
 
   return (
     <>
-      <div
-        ref={containerRef}
-        className="min-h-0 flex-1 snap-y snap-mandatory overflow-y-scroll overscroll-y-contain"
-        style={{
-          scrollSnapStop: "always",
-          WebkitOverflowScrolling: "touch",
-        }}
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="pointer-events-auto fixed bottom-[calc(4.85rem+env(safe-area-inset-bottom))] left-4 z-40 rounded-full px-4 py-2 shadow-lg shadow-black/25 sm:gap-2"
+        onClick={() => setGenerateOpen(true)}
+        aria-expanded={generateOpen}
+        aria-label="Build custom card session"
       >
-        {cards.map((card, index) => (
-          <section
-            key={`${card.id}-${index}`}
-            data-feed-slide
-            data-card-id={`${card.id}-${index}`}
-            className="box-border flex h-full shrink-0 snap-start snap-always flex-col px-3 pt-3"
-          >
-            <LessonSlide
-              card={card}
-              saved={savedIds.has(card.id)}
-              onToggleSave={(next) => updateSaved(card.id, next)}
-              onExplain={handleExplain}
-            />
-          </section>
-        ))}
-        <div
-          ref={sentinelRef}
-          className="shrink-0 snap-start px-3 pt-3"
-          style={{ minHeight: "40vh" }}
-        >
-          <div className="flex flex-col gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/30 p-6 text-center text-sm text-muted-foreground">
-            {loading ? (
-              <>
-                <Skeleton className="mx-auto h-4 w-40 rounded-full" />
-                <Skeleton className="mx-auto h-4 w-56 rounded-full" />
-              </>
-            ) : (
-              <p>Keep swiping — more micro-lessons incoming.</p>
-            )}
-          </div>
-        </div>
-      </div>
+        <Layers className="size-4 shrink-0" aria-hidden />
+        <span className="max-sm:hidden">Custom session</span>
+      </Button>
 
-      <Sheet open={explainOpen} onOpenChange={setExplainOpen}>
-        <SheetContent side="bottom" className="h-[70dvh] rounded-t-3xl border-border/80">
-          <SheetHeader>
-            <SheetTitle className="text-left text-2xl">
-              {explainTarget?.title ?? "AI coach"}
-            </SheetTitle>
-            <SheetDescription className="text-left text-base">
-              Short breakdown tuned for busy builders.
-            </SheetDescription>
-          </SheetHeader>
-          <ScrollArea className="mt-4 h-[48dvh] pr-3">
-            {explainLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-4 w-full rounded-full" />
-                <Skeleton className="h-4 w-full rounded-full" />
-                <Skeleton className="h-4 w-3/4 rounded-full" />
+      <GenerateSessionSheet
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        onGenerated={prependGenerated}
+      />
+
+      {showInitialSkeleton ? (
+        <FeedSkeleton />
+      ) : (
+        <>
+          <div
+            ref={containerRef}
+            className="min-h-0 flex-1 snap-y snap-mandatory overflow-y-scroll overscroll-y-contain"
+            style={{
+              scrollSnapStop: "always",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            {cards.map((card, index) => (
+              <section
+                key={`${card.id}-${index}`}
+                data-feed-slide
+                data-card-id={`${card.id}-${index}`}
+                className="box-border flex h-full shrink-0 snap-start snap-always flex-col px-3 pt-3"
+              >
+                <LessonSlide
+                  card={card}
+                  saved={savedIds.has(card.id)}
+                  onToggleSave={(next) => updateSaved(card.id, next)}
+                  onExplain={handleExplain}
+                />
+              </section>
+            ))}
+            <div
+              ref={sentinelRef}
+              className="shrink-0 snap-start px-3 pt-3"
+              style={{ minHeight: "40vh" }}
+            >
+              <div className="flex flex-col gap-3 rounded-3xl border border-dashed border-border/70 bg-muted/30 p-6 text-center text-sm text-muted-foreground">
+                {loading ? (
+                  <>
+                    <Skeleton className="mx-auto h-4 w-40 rounded-full" />
+                    <Skeleton className="mx-auto h-4 w-56 rounded-full" />
+                  </>
+                ) : (
+                  <p>Keep swiping — more micro-lessons incoming.</p>
+                )}
               </div>
-            ) : (
-              <p className="whitespace-pre-wrap text-lg leading-relaxed text-muted-foreground">
-                {explainText}
-              </p>
-            )}
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
+            </div>
+          </div>
+
+          <Sheet open={explainOpen} onOpenChange={setExplainOpen}>
+            <SheetContent side="bottom" className="h-[70dvh] rounded-t-3xl border-border/80">
+              <SheetHeader>
+                <SheetTitle className="text-left text-2xl">
+                  {explainTarget?.title ?? "AI coach"}
+                </SheetTitle>
+                <SheetDescription className="text-left text-base">
+                  Short breakdown tuned for busy builders.
+                </SheetDescription>
+              </SheetHeader>
+              <ScrollArea className="mt-4 h-[48dvh] pr-3">
+                {explainLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-full rounded-full" />
+                    <Skeleton className="h-4 w-full rounded-full" />
+                    <Skeleton className="h-4 w-3/4 rounded-full" />
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-lg leading-relaxed text-muted-foreground">
+                    {explainText}
+                  </p>
+                )}
+              </ScrollArea>
+            </SheetContent>
+          </Sheet>
+        </>
+      )}
     </>
   );
 }
