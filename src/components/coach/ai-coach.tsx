@@ -904,6 +904,8 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
 
               const readToggleKey = `${activeThreadId}-msg-${idx}`;
               const isReadingThis = ttsSourceKey === readToggleKey;
+              const showFollowUpSuggestions =
+                idx === messages.length - 1 && m.suggestions.length > 0;
 
               return (
                 <div
@@ -970,19 +972,24 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
                     </div>
                   ) : null}
 
-                  {m.suggestions.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {m.suggestions.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void sendPayload(s)}
-                          className="rounded-full border border-dashed border-border px-2.5 py-1 text-muted-foreground text-xs hover:border-primary hover:text-primary disabled:opacity-50"
-                        >
-                          {s}
-                        </button>
-                      ))}
+                  {showFollowUpSuggestions ? (
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+                        Reply ideas
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {m.suggestions.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void sendPayload(s)}
+                            className="rounded-full border border-dashed border-border px-2.5 py-1 text-muted-foreground text-xs hover:border-primary hover:text-primary disabled:opacity-50"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                 </div>

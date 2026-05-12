@@ -277,7 +277,7 @@ export async function POST(request: Request) {
     `Respond as ONE JSON object only (no markdown fences). Keys:
 - reply (string): your conversational answer to the learner; plain text or light Markdown (**bold** ok).
 - corrections (array, max 5 items): objects { wrong, better, why? } drawn from the user's latest message when relevant.
-- suggestions (array of 2–3 strings): short next prompts tailored to ${level} level and the selected topic.`,
+- suggestions (array of 2–3 strings): short candidate **user replies** the learner could send next, written in the first person as natural English they would type. Each line MUST react to the concrete content of your \`reply\` string (answer your questions, react to claims, add detail you invited, or politely clarify). If you asked a question, at least one suggestion should answer it. Do not reuse generic icebreakers, do not restart the scenario, and do not pivot topics unless your \`reply\` already moved there. Match ${level} level.`,
     "If no corrections are needed, use an empty array for corrections.",
   ].join("\n");
 
