@@ -71,6 +71,7 @@ const LEVELS: LearnerLevel[] = ["beginner", "intermediate", "advanced"];
 const CUSTOM_TOPIC_MAX = 400;
 
 const LS_AUTO_READ = "idle_coach_auto_read_v1";
+const LS_TOPIC_LEVEL_OPEN = "idle_coach_topic_level_open_v1";
 const LS_STT_LANG = "idle_coach_stt_lang_v1";
 const LS_TTS_LANG = "idle_coach_tts_lang_v1";
 
@@ -166,6 +167,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
       setActiveThreadId(merged.activeThreadId);
       prefetchSpeechVoices();
       setAutoReadAloud(readCoachPrefBool(LS_AUTO_READ, true));
+      setTopicLevelOpen(readCoachPrefBool(LS_TOPIC_LEVEL_OPEN, true));
       setSttLang(readCoachLocale(LS_STT_LANG, "en-US"));
       setTtsLang(readCoachLocale(LS_TTS_LANG, "en-US"));
       setHydrated(true);
@@ -258,6 +260,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     const t = createCoachThread(level);
     setThreads((prev) => trimThreads([t, ...prev]));
     setActiveThreadId(t.id);
+    setTopicLevelOpen(true);
     toast.message("New conversation");
   }, [stopVoiceUi]);
 
@@ -286,6 +289,13 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     setAutoReadAloud(next);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(LS_AUTO_READ, next ? "1" : "0");
+    }
+  }, []);
+
+  const handleTopicLevelOpenChange = useCallback((next: boolean) => {
+    setTopicLevelOpen(next);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LS_TOPIC_LEVEL_OPEN, next ? "1" : "0");
     }
   }, []);
 
@@ -765,7 +775,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
 
       <button
         type="button"
-        onClick={() => setTopicLevelOpen((o) => !o)}
+        onClick={() => handleTopicLevelOpenChange(!topicLevelOpen)}
         aria-expanded={topicLevelOpen}
         className="text-muted-foreground flex w-full shrink-0 items-center justify-between gap-2 rounded-lg py-1 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none"
       >
