@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 
 import {
   CARD_CATEGORIES,
@@ -32,13 +32,81 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+function shuffleInPlace<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomInt(0, i + 1);
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+}
+
+/** When randomizing: sample 2–4 categories from the learner’s pool (or blend in catalog if pool is tiny). */
+function pickRandomCategoryMix(
+  requested: CardCategoryId[],
+  randomize: boolean,
+): CardCategoryId[] {
+  const uniq = [...new Set(requested)];
+  if (!randomize) return uniq;
+
+  const allIds = CARD_CATEGORIES.map((c) => c.id);
+
+  if (uniq.length >= 2) {
+    const pool = [...uniq];
+    shuffleInPlace(pool);
+    const maxK = Math.min(4, pool.length);
+    const minK = Math.min(2, pool.length);
+    const span = maxK - minK + 1;
+    const k = span <= 1 ? maxK : minK + randomInt(0, span);
+    return pool.slice(0, k);
+  }
+
+  if (uniq.length === 1) {
+    const anchor = uniq[0]!;
+    const rest = allIds.filter((id) => id !== anchor);
+    shuffleInPlace(rest);
+    const extras = clamp(1 + randomInt(0, 3), 1, rest.length); // total 2–4 incl. anchor
+    return [anchor, ...rest.slice(0, extras)];
+  }
+
+  shuffleInPlace([...allIds]);
+  const maxK = Math.min(4, allIds.length);
+  const k = maxK <= 2 ? maxK : 2 + randomInt(0, maxK - 1);
+  return allIds.slice(0, k);
+}
+
 const USER_NOTES_MAX = 500;
+const VARIATION_SEED_MAX = 128;
 
 function normalizeUserNotes(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const t = raw.replace(/\u0000/g, "").trim();
   if (!t) return null;
   return t.slice(0, USER_NOTES_MAX);
+}
+
+function normalizeVariationSeed(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.replace(/\u0000/g, "").trim().slice(0, VARIATION_SEED_MAX);
+  return t.length ? t : null;
+}
+
+const EXCLUDE_TITLE_LIST_MAX = 48;
+const EXCLUDE_TITLE_CHARS_MAX = 160;
+
+function normalizeExcludeTitles(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of raw) {
+    if (typeof x !== "string") continue;
+    const t = x.replace(/\u0000/g, "").trim().slice(0, EXCLUDE_TITLE_CHARS_MAX);
+    if (!t) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+    if (out.length >= EXCLUDE_TITLE_LIST_MAX) break;
+  }
+  return out;
 }
 
 type RawItem = {
@@ -276,9 +344,13 @@ function fallbackLessonCards(
   categoryIds: CardCategoryId[],
   defaultLevel: LearnerLevel,
   count: number,
+  randomize: boolean,
+  excludeTitles: string[],
 ): LessonCard[] {
   const pool: Omit<LessonCard, "id">[] = [];
-  for (const id of categoryIds) {
+  const order = randomize ? [...categoryIds] : categoryIds;
+  if (randomize) shuffleInPlace(order);
+  for (const id of order) {
     const pack = FALLBACK_LESSONS[id];
     if (!pack?.length) continue;
     pool.push(...pack);
@@ -287,9 +359,23 @@ function fallbackLessonCards(
   const out: LessonCard[] = [];
   if (!pool.length) return out;
 
-  let i = 0;
+  const excludeNorm = new Set(
+    excludeTitles.map((t) => t.trim().toLowerCase()).filter(Boolean),
+  );
+
+  let source = pool as Omit<LessonCard, "id">[];
+  if (excludeNorm.size) {
+    const filtered = pool.filter(
+      (b) => !excludeNorm.has(b.title.trim().toLowerCase()),
+    );
+    if (filtered.length) source = filtered;
+  }
+
+  if (randomize) shuffleInPlace(source);
+
+  let i = randomize ? randomInt(0, source.length) : 0;
   while (out.length < count) {
-    const base = pool[i % pool.length]!;
+    const base = source[i % source.length]!;
     const level = base.level ?? defaultLevel;
     out.push({
       ...base,
@@ -312,6 +398,9 @@ async function generateLessonCardsWithLlm(
   defaultLevel: LearnerLevel,
   count: number,
   userNotes: string | null,
+  randomize: boolean,
+  variationSeed: string | null,
+  excludeTitles: string[],
 ): Promise<LessonCard[] | null> {
   const focus = selections.map((c) => `- ${c.promptFocus}`).join("\n");
   const tagHints = selections.map((c) => c.id);
@@ -323,11 +412,34 @@ ${userNotes}
 `
     : "";
 
+  const seedBlock = variationSeed
+    ? `
+Freshness seed (this batch must feel distinct from prior runs — vary scenarios, wording, and card types accordingly):
+${variationSeed}
+`
+    : "";
+
+  const excludeBlock =
+    excludeTitles.length > 0
+      ? `
+Banned titles — do NOT reuse, mimic, or trivially paraphrase any of these strings as card titles (write wholly different titles):
+${excludeTitles.map((t) => `- ${JSON.stringify(t)}`).join("\n")}
+`
+      : "";
+
+  const varietyBlock = randomize
+    ? `
+Variety mandate:
+- Rotate scenarios unpredictably across this batch — distinct contexts and angles.
+- Avoid repeating tired interview clichés card-to-card.
+`
+    : "";
+
   const userPrompt = `You create bite-sized spoken English drills for developers.
 
 Categories to blend across the batch:
 ${focus}
-${learnerBlock}
+${learnerBlock}${seedBlock}${excludeBlock}${varietyBlock}
 Global constraints:
 - Return JSON only: {"items":[...]}
 - Produce exactly ${count} items.
@@ -358,7 +470,7 @@ Default learner level fallback: ${defaultLevel}.`;
       },
       { role: "user", content: userPrompt },
     ],
-    temperature: 0.55,
+    temperature: randomize ? 0.82 : 0.55,
     response_format: { type: "json_object" },
   });
 
@@ -384,10 +496,16 @@ Default learner level fallback: ${defaultLevel}.`;
 
   const rawItems = (parsed as { items: RawItem[] }).items.slice(0, count);
 
+  const excludeNorm = new Set(
+    excludeTitles.map((t) => t.trim().toLowerCase()).filter(Boolean),
+  );
+
   const items: LessonCard[] = [];
   for (const raw of rawItems) {
     const card = normalizeItem(raw, defaultLevel, [...tagHints, "generated"]);
-    if (card) items.push(card);
+    if (!card) continue;
+    if (excludeNorm.has(card.title.trim().toLowerCase())) continue;
+    items.push(card);
   }
 
   return items.length ? items : null;
@@ -410,9 +528,18 @@ export async function POST(request: Request) {
     level?: unknown;
     count?: unknown;
     notes?: unknown;
+    randomize?: unknown;
+    variationSeed?: unknown;
+    excludeTitles?: unknown;
   };
 
+  const randomize = b.randomize === true;
+
   const userNotes = normalizeUserNotes(b.notes);
+  const variationSeed =
+    normalizeVariationSeed(b.variationSeed) ??
+    (randomize ? `srv-${randomBytes(12).toString("hex")}` : null);
+  const excludeTitles = normalizeExcludeTitles(b.excludeTitles);
 
   if (!Array.isArray(b.categoryIds) || b.categoryIds.length === 0) {
     return Response.json({ error: "category_ids_required" }, { status: 400 });
@@ -433,7 +560,10 @@ export async function POST(request: Request) {
     8,
   );
 
-  const selections = CARD_CATEGORIES.filter((c) => categoryIds.includes(c.id));
+  const effectiveCategoryIds = pickRandomCategoryMix(categoryIds, randomize);
+  const selections = effectiveCategoryIds
+    .map((id) => CARD_CATEGORIES.find((c) => c.id === id))
+    .filter((c): c is (typeof CARD_CATEGORIES)[number] => Boolean(c));
 
   const llm = resolveServerLlm();
 
@@ -446,15 +576,21 @@ export async function POST(request: Request) {
       defaultLevel,
       count,
       userNotes,
+      randomize,
+      variationSeed,
+      excludeTitles,
     );
-    items = ai ?? fallbackLessonCards(categoryIds, defaultLevel, count);
+    items = ai ?? fallbackLessonCards(effectiveCategoryIds, defaultLevel, count, randomize, excludeTitles);
   } else {
-    items = fallbackLessonCards(categoryIds, defaultLevel, count);
+    items = fallbackLessonCards(effectiveCategoryIds, defaultLevel, count, randomize, excludeTitles);
   }
 
   if (!items.length) {
     return Response.json({ error: "empty_generation" }, { status: 500 });
   }
 
-  return Response.json({ items });
+  return Response.json(
+    { items },
+    { headers: { "Cache-Control": "no-store, max-age=0" } },
+  );
 }

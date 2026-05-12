@@ -35,12 +35,15 @@ type GenerateSessionSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onGenerated: (cards: LessonCard[]) => void;
+  /** Titles already visible on the feed — server avoids duplicates when generating. */
+  excludeTitles?: string[];
 };
 
 export function GenerateSessionSheet({
   open,
   onOpenChange,
   onGenerated,
+  excludeTitles = [],
 }: GenerateSessionSheetProps) {
   const [selected, setSelected] = useState<Set<CardCategoryId>>(() => {
     const { categoryIds } = readGenerateSessionPrefs();
@@ -111,6 +114,10 @@ export function GenerateSessionSheet({
     }
     setBusy(true);
     try {
+      const variationSeed =
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       const res = await fetch("/api/cards/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -119,7 +126,11 @@ export function GenerateSessionSheet({
           level,
           count: 6,
           notes: notes.trim() || undefined,
+          randomize: true,
+          variationSeed,
+          ...(excludeTitles.length ? { excludeTitles } : {}),
         }),
+        cache: "no-store",
         signal: AbortSignal.timeout(45_000),
       });
       const data = (await res.json()) as FeedGenResponse;
@@ -144,7 +155,7 @@ export function GenerateSessionSheet({
     } finally {
       setBusy(false);
     }
-  }, [level, notes, onGenerated, onOpenChange, selected]);
+  }, [excludeTitles, level, notes, onGenerated, onOpenChange, selected]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -152,7 +163,7 @@ export function GenerateSessionSheet({
         <SheetHeader className="text-left">
           <SheetTitle className="text-2xl">Build a mini session</SheetTitle>
           <SheetDescription className="text-base">
-            Pick focus areas — add optional notes so the batch can lean your way (AI path).
+            Checked areas form a pool — each run randomly mixes 2–4 of them so batches stay fresh (fallback packs shuffle too).
           </SheetDescription>
         </SheetHeader>
 

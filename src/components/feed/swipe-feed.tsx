@@ -7,10 +7,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { Layers, Loader2, Sparkles } from "lucide-react";
+import { Layers, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import type { LessonCard } from "@/types/card";
+import { collectExcludeTitles } from "@/lib/card-title-exclusions";
 import { readGenerateSessionPrefs } from "@/lib/generate-session-prefs";
 import { pingLearnSession } from "@/app/actions/progress";
 import {
@@ -67,6 +68,8 @@ export function SwipeFeed({
   const [explainText, setExplainText] = useState<string>("");
   const [explainLoading, setExplainLoading] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [refreshBusy, setRefreshBusy] = useState(false);
+  const [deckEpoch, setDeckEpoch] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -74,6 +77,12 @@ export function SwipeFeed({
   const loadingMoreRef = useRef(false);
   const cooldownUntilRef = useRef(0);
   const offsetRef = useRef(0);
+  const refreshLockRef = useRef(false);
+  const cardsRef = useRef<LessonCard[]>([]);
+
+  useEffect(() => {
+    cardsRef.current = cards;
+  }, [cards]);
 
   useEffect(() => {
     offsetRef.current = offset;
@@ -105,6 +114,42 @@ export function SwipeFeed({
     }
   }, []);
 
+  const fetchFreshAiDeck = useCallback(
+    async (excludeTitles?: string[]): Promise<LessonCard[] | null> => {
+      try {
+        const prefs = readGenerateSessionPrefs();
+        const variationSeed =
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+        const res = await fetch("/api/cards/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            categoryIds: prefs.categoryIds,
+            level: prefs.level,
+            count: 8,
+            notes: prefs.notes.trim() || undefined,
+            randomize: true,
+            variationSeed,
+            ...(excludeTitles?.length
+              ? { excludeTitles }
+              : {}),
+          }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(45_000),
+        });
+        const data = (await res.json()) as FeedGenResponse;
+        const batch = data.items;
+        if (res.ok && batch?.length) return batch;
+      } catch {
+        /* caller handles null */
+      }
+      return null;
+    },
+    [],
+  );
+
   const fetchCuratedAppend = useCallback(async (nextOffset: number) => {
     const res = await fetch(`/api/cards?offset=${nextOffset}&limit=8`, {
       cache: "no-store",
@@ -132,36 +177,18 @@ export function SwipeFeed({
   }, [applyOfflineFallback, fetchCuratedAppend]);
 
   const tryAppendAiBatch = useCallback(async (): Promise<boolean> => {
-    try {
-      const prefs = readGenerateSessionPrefs();
-      const res = await fetch("/api/cards/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          categoryIds: prefs.categoryIds,
-          level: prefs.level,
-          count: 8,
-          notes: prefs.notes.trim() || undefined,
-        }),
-        signal: AbortSignal.timeout(45_000),
-      });
-      const data = (await res.json()) as FeedGenResponse;
-      const batch = data.items;
-      if (res.ok && batch?.length) {
-        const currentScrollTop = containerRef.current?.scrollTop;
-        setCards((prev) => [...prev, ...batch]);
-        setTimeout(() => {
-          if (containerRef.current) {
-            containerRef.current.scrollTo({ top: currentScrollTop });
-          }
-        }, 100);
-        return true;
+    const excludeTitles = collectExcludeTitles(cardsRef.current);
+    const batch = await fetchFreshAiDeck(excludeTitles);
+    if (!batch?.length) return false;
+    const currentScrollTop = containerRef.current?.scrollTop;
+    setCards((prev) => [...prev, ...batch]);
+    setTimeout(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({ top: currentScrollTop ?? 0 });
       }
-    } catch {
-      /* fall through to curated */
-    }
-    return false;
-  }, []);
+    }, 100);
+    return true;
+  }, [fetchFreshAiDeck]);
 
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current) return;
@@ -185,36 +212,49 @@ export function SwipeFeed({
 
   const loadInitialDeck = useCallback(async () => {
     setLoading(true);
-    let aiLoaded = false;
-    try {
-      const prefs = readGenerateSessionPrefs();
-      const res = await fetch("/api/cards/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          categoryIds: prefs.categoryIds,
-          level: prefs.level,
-          count: 8,
-          notes: prefs.notes.trim() || undefined,
-        }),
-        signal: AbortSignal.timeout(45_000),
-      });
-      const data = (await res.json()) as FeedGenResponse;
-      if (res.ok && data.items?.length) {
-        setCards(data.items);
-        setOffset(0);
-        aiLoaded = true;
-      }
-    } catch {
-      /* fall through to curated feed */
-    }
-    if (!aiLoaded) {
-      await fetchPage(0);
-    } else {
+    const cached = readRecentCards();
+    const excludeTitles = cached?.length
+      ? collectExcludeTitles(cached)
+      : [];
+    const batch = await fetchFreshAiDeck(excludeTitles);
+    if (batch?.length) {
+      setDeckEpoch((e) => e + 1);
+      setCards(batch);
+      setOffset(0);
       setLoading(false);
       setInitialLoading(false);
+      return;
     }
-  }, [fetchPage]);
+    await fetchPage(0);
+  }, [fetchFreshAiDeck, fetchPage]);
+
+  const refreshAiDeck = useCallback(async () => {
+    if (initialLoading && cards.length === 0) return;
+    if (refreshLockRef.current || loadingMoreRef.current) return;
+    refreshLockRef.current = true;
+    setRefreshBusy(true);
+    loadingMoreRef.current = true;
+    try {
+      const excludeTitles = collectExcludeTitles(cardsRef.current);
+      const batch = await fetchFreshAiDeck(excludeTitles);
+      if (batch?.length) {
+        setDeckEpoch((e) => e + 1);
+        setCards(batch);
+        setOffset(0);
+        rewardedRef.current = new Set();
+        requestAnimationFrame(() => {
+          containerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+        });
+        toast.success("New AI deck loaded.");
+      } else {
+        toast.error("Could not refresh cards — try again.");
+      }
+    } finally {
+      refreshLockRef.current = false;
+      setRefreshBusy(false);
+      loadingMoreRef.current = false;
+    }
+  }, [cards.length, fetchFreshAiDeck, initialLoading]);
 
   useEffect(() => {
     startTransition(() => {
@@ -347,10 +387,29 @@ export function SwipeFeed({
         <span className="max-sm:hidden">Custom session</span>
       </Button>
 
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="pointer-events-auto fixed bottom-[calc(4.85rem+env(safe-area-inset-bottom))] right-4 z-40 rounded-full px-4 py-2 shadow-lg shadow-black/25 sm:gap-2"
+        disabled={refreshBusy || showInitialSkeleton}
+        onClick={() => void refreshAiDeck()}
+        aria-busy={refreshBusy}
+        aria-label="Generate new AI deck"
+      >
+        {refreshBusy ? (
+          <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+        ) : (
+          <RefreshCw className="size-4 shrink-0" aria-hidden />
+        )}
+        <span className="max-sm:hidden">Refresh deck</span>
+      </Button>
+
       <GenerateSessionSheet
         open={generateOpen}
         onOpenChange={setGenerateOpen}
         onGenerated={prependGenerated}
+        excludeTitles={collectExcludeTitles(cards)}
       />
 
       {showInitialSkeleton ? (
@@ -367,7 +426,7 @@ export function SwipeFeed({
           >
             {cards.map((card, index) => (
               <section
-                key={`${card.id}-${index}`}
+                key={`${deckEpoch}-${index}-${card.id}`}
                 data-feed-slide
                 data-card-id={`${card.id}-${index}`}
                 className="box-border flex h-full shrink-0 snap-start snap-always flex-col px-3 pt-3"
