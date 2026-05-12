@@ -17,6 +17,10 @@ import {
   persistRecentCards,
   readRecentCards,
 } from "@/lib/offline-cache";
+import {
+  IDLE_SAVED_ENTRIES_CHANGED,
+  type IdleSavedEntriesChangedDetail,
+} from "@/lib/saved-storage";
 import { LessonSlide } from "@/components/feed/lesson-slide";
 import { GenerateSessionSheet } from "@/components/feed/generate-session-sheet";
 import { FeedSkeleton } from "@/components/feed/feed-skeleton";
@@ -67,6 +71,22 @@ export function SwipeFeed({
   useEffect(() => {
     offsetRef.current = offset;
   }, [offset]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<IdleSavedEntriesChangedDetail>).detail;
+      if (!detail) return;
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (detail.removedId) next.delete(detail.removedId);
+        if (detail.addedId) next.add(detail.addedId);
+        return next;
+      });
+    };
+    window.addEventListener(IDLE_SAVED_ENTRIES_CHANGED, handler);
+    return () =>
+      window.removeEventListener(IDLE_SAVED_ENTRIES_CHANGED, handler);
+  }, []);
 
   const fetchPage = useCallback(async (nextOffset: number) => {
     if (loadingMoreRef.current) return;

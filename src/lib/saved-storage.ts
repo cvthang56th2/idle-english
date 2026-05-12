@@ -8,6 +8,21 @@ export type SavedEntry = {
 
 const SAVED_ENTRIES_KEY = "idle_saved_entries_v1";
 
+/** Dispatched after local saved entries change so the feed can sync bookmark UI. */
+export const IDLE_SAVED_ENTRIES_CHANGED = "idle-saved-entries-changed";
+
+export type IdleSavedEntriesChangedDetail = {
+  removedId?: string;
+  addedId?: string;
+};
+
+function notifySavedEntriesChanged(detail: IdleSavedEntriesChangedDetail) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(IDLE_SAVED_ENTRIES_CHANGED, { detail }),
+  );
+}
+
 export function readSavedEntries(): SavedEntry[] {
   if (typeof window === "undefined") return [];
   try {
@@ -37,8 +52,10 @@ export function upsertSavedEntry(card: LessonCard) {
     savedAt: Date.now(),
   });
   writeSavedEntries(entries);
+  notifySavedEntriesChanged({ addedId: card.id });
 }
 
 export function removeSavedEntry(id: string) {
   writeSavedEntries(readSavedEntries().filter((e) => e.id !== id));
+  notifySavedEntriesChanged({ removedId: id });
 }
