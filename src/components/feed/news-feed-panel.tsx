@@ -276,6 +276,7 @@ export function NewsFeedPanel() {
                   <article className="flex gap-2 rounded-2xl border border-border/70 bg-card/50 p-3 shadow-sm backdrop-blur-sm">
                     <a
                       href={a.link}
+                      target="_blank"
                       rel="noopener noreferrer"
                       className="min-w-0 flex-1 block"
                     >
@@ -301,6 +302,7 @@ export function NewsFeedPanel() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         <a
                           href={a.link}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
                             buttonVariants({ variant: "outline", size: "sm" }),
