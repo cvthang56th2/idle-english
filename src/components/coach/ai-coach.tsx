@@ -601,23 +601,18 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 pb-2 pt-1">
       <div className="flex shrink-0 flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <p className="text-muted-foreground shrink-0 text-xs font-medium tracking-wide uppercase">
-            Chats
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="xs"
-            className="ml-auto shrink-0 gap-1"
-            onClick={startNewConversation}
-          >
-            <Plus className="size-3.5" aria-hidden />
-            New
-          </Button>
-        </div>
         <div className="-mx-1 flex max-h-[92px] min-h-0 flex-col gap-1 overflow-hidden">
-          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-2 items-center overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              className="ml-auto shrink-0 gap-1"
+              onClick={startNewConversation}
+            >
+              <Plus className="size-3.5" aria-hidden />
+              New
+            </Button>
             {sortedThreads.map((t) => {
               const active = t.id === activeThreadId;
               return (

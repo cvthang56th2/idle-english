@@ -4,7 +4,7 @@ import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { AppHeader } from "@/components/layout/app-header";
-import { SwipeFeed } from "@/components/feed/swipe-feed";
+import { LearnFeedShell } from "@/components/feed/learn-feed-shell";
 import { ShortsFeed } from "@/components/shorts/shorts-feed";
 import { cn } from "@/lib/utils";
 import type { SavedShortSnapshot } from "@/types/saved-short";
@@ -53,10 +53,10 @@ export function PersistentFeedShell({
             singleLine
             eyebrow="IdleEnglish"
             title="Learn in the gaps"
-            detail="Vertical micro-lessons · swipe up"
+            detail="Cards swipe up · News reads from English sources"
             showFeedShortcut={false}
           />
-          <SwipeFeed initialSavedIds={initialSavedIds} />
+          <LearnFeedShell initialSavedIds={initialSavedIds} />
         </div>
       ) : null}
 

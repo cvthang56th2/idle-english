@@ -1,6 +1,6 @@
 export const metadata = {
   title: "Learn · IdleEnglish",
-  description: "Swipe through micro English lessons while you wait.",
+  description: "Lesson cards plus English-reading news feeds in one lane.",
 };
 
 /** Learn UI is rendered by `PersistentFeedShell` in `(app)/layout` so tab switches preserve scroll + loaded cards. */
