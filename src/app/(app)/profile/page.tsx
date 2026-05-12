@@ -5,7 +5,7 @@ import { getAuthSyncSummary } from "@/lib/auth-sync";
 
 export const metadata = {
   title: "Profile · IdleEnglish",
-  description: "XP, streaks, and install hooks for IdleEnglish.",
+  description: "Account, installs, and saved-cards sync for IdleEnglish.",
 };
 
 export default async function ProfilePage() {

@@ -36,6 +36,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { SHOW_STREAK_UI } from "@/lib/feature-flags";
 import { cn } from "@/lib/utils";
 
 type FeedResponse = {
@@ -187,13 +188,8 @@ export function SwipeFeed({
     if (rewardedRef.current.has(cardId)) return;
     rewardedRef.current.add(cardId);
     void pingLearnSession().then((res) => {
-      if (res.ok && res.persisted === "remote") {
-        toast.success(
-          `+5 XP${typeof res.streak === "number" ? ` · ${res.streak} day streak` : ""}`,
-        );
-      } else {
-        const local = bumpLocalProgress();
-        toast.success(`+5 XP · ${local.streak} day streak`);
+      if (!res.ok || res.persisted !== "remote") {
+        bumpLocalProgress();
       }
     });
   }, []);
@@ -394,8 +390,14 @@ export function SwipeFeed({
                         </p>
                         {!explainText.includes("try again shortly") ? (
                           <p className="mt-4 text-xs text-muted-foreground">
-                            Tip: close anytime — your streak still counts while
-                            you skim the feed.
+                            {SHOW_STREAK_UI ? (
+                              <>
+                                Tip: close anytime — your streak still counts
+                                while you skim the feed.
+                              </>
+                            ) : (
+                              "Tip: close anytime — you can keep skimming the feed."
+                            )}
                           </p>
                         ) : null}
                       </div>

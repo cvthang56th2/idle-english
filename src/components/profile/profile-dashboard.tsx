@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { AuthSyncSummary } from "@/lib/auth-sync";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import { SHOW_STREAK_UI, SHOW_XP_UI } from "@/lib/feature-flags";
 import { readLocalProgress } from "@/lib/offline-cache";
 
 type BeforeInstallPromptEvent = Event & {
@@ -25,7 +26,14 @@ function syncCopy(summary: AuthSyncSummary): {
     case "unconfigured":
       return {
         title: "Cloud backup off",
-        body: "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, and enable Anonymous sign-ins in Supabase, to sync saves and XP.",
+        body:
+          SHOW_XP_UI && SHOW_STREAK_UI
+            ? "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, and enable Anonymous sign-ins in Supabase, to sync saves, XP, and streaks."
+            : SHOW_XP_UI
+              ? "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, and enable Anonymous sign-ins in Supabase, to sync saves and XP."
+              : SHOW_STREAK_UI
+                ? "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, and enable Anonymous sign-ins in Supabase, to sync saves and learning streak."
+                : "Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, and enable Anonymous sign-ins in Supabase, to sync saves.",
         icon: CloudOff,
       };
     case "no_client":
@@ -43,7 +51,14 @@ function syncCopy(summary: AuthSyncSummary): {
     case "anonymous":
       return {
         title: "Guest cloud session",
-        body: "XP and saved cards sync for this browser. Sign in with email to recover progress on another device.",
+        body:
+          SHOW_XP_UI && SHOW_STREAK_UI
+            ? "XP, streaks, and saved cards sync for this browser. Sign in with email to recover progress on another device."
+            : SHOW_XP_UI
+              ? "XP and saved cards sync for this browser. Sign in with email to recover progress on another device."
+              : SHOW_STREAK_UI
+                ? "Daily streak and saved cards sync for this browser. Sign in with email to recover progress on another device."
+                : "Saved cards sync for this browser. Sign in with email to recover progress on another device.",
         icon: Cloud,
       };
     case "signed_in":
@@ -89,8 +104,6 @@ export function ProfileDashboard({
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  const xp = Math.max(remoteXp, local.xp);
-  const streak = Math.max(remoteStreak, local.streak);
   const sync = syncCopy(authSync);
   const SyncIcon = sync.icon;
 
@@ -118,28 +131,40 @@ export function ProfileDashboard({
     authSync.state === "no_user" ||
     authSync.state === "no_client";
 
+  const showStatsGrid =
+    SHOW_XP_UI || SHOW_STREAK_UI || Boolean(lastLearnedAt);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pb-8">
-      <section className="grid gap-4">
-        <div className="rounded-[26px] border border-border/70 bg-gradient-to-br from-emerald-500/15 via-card to-background p-6 shadow-[0_22px_70px_rgba(0,0,0,0.35)]">
-          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-            XP
-          </p>
-          <p className="mt-2 text-5xl font-semibold tracking-tight">{xp}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Earn +5 XP whenever a lesson fills your screen.
-          </p>
-        </div>
+      {showStatsGrid ? (
+        <section className="grid gap-4">
+        {SHOW_XP_UI ? (
+          <div className="rounded-[26px] border border-border/70 bg-gradient-to-br from-emerald-500/15 via-card to-background p-6 shadow-[0_22px_70px_rgba(0,0,0,0.35)]">
+            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              XP
+            </p>
+            <p className="mt-2 text-5xl font-semibold tracking-tight">
+              {Math.max(remoteXp, local.xp)}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Earn +5 XP whenever a lesson fills your screen.
+            </p>
+          </div>
+        ) : null}
 
-        <div className="rounded-[26px] border border-border/70 bg-card/70 p-6 backdrop-blur-md">
-          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-            Daily streak
-          </p>
-          <p className="mt-2 text-5xl font-semibold tracking-tight">{streak}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Learn at least once per day to keep the flame alive.
-          </p>
-        </div>
+        {SHOW_STREAK_UI ? (
+          <div className="rounded-[26px] border border-border/70 bg-card/70 p-6 backdrop-blur-md">
+            <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+              Daily streak
+            </p>
+            <p className="mt-2 text-5xl font-semibold tracking-tight">
+              {Math.max(remoteStreak, local.streak)}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Learn at least once per day to keep the flame alive.
+            </p>
+          </div>
+        ) : null}
 
         {lastLearnedAt ? (
           <p className="text-center text-xs text-muted-foreground">
@@ -150,7 +175,8 @@ export function ProfileDashboard({
             })}
           </p>
         ) : null}
-      </section>
+        </section>
+      ) : null}
 
       <section className="rounded-[26px] border border-border/70 bg-card/50 p-6 backdrop-blur-md">
         <div className="flex gap-4">

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { SHOW_STREAK_UI } from "@/lib/feature-flags";
 import { Button } from "@/components/ui/button";
 
 export default function AppRouteError({
@@ -20,7 +21,10 @@ export default function AppRouteError({
       <div className="space-y-2">
         <p className="text-lg font-semibold tracking-tight">This screen hit a snag</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          {error.message || "Try again — your streak and saves stay on this device."}
+          {error.message ||
+            (SHOW_STREAK_UI
+              ? "Try again — your streak and saves stay on this device."
+              : "Try again — your saves stay on this device.")}
         </p>
       </div>
       <Button
