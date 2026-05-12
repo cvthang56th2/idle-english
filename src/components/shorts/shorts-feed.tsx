@@ -9,7 +9,15 @@ import {
   useTransition,
   type CSSProperties,
 } from "react";
-import { Clapperboard, Library, Loader2, Radio, Search, Bookmark } from "lucide-react";
+import {
+  Bookmark,
+  Clapperboard,
+  Library,
+  Loader2,
+  Radio,
+  RefreshCw,
+  Search,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import type { YoutubeSearchVideo } from "@/lib/youtube/types";
@@ -37,6 +45,10 @@ import {
   upsertSavedShortEntry,
 } from "@/lib/saved-shorts-storage";
 import type { SavedShortSnapshot } from "@/types/saved-short";
+import {
+  isYoutubeSearchOrder,
+  type YoutubeSearchOrder,
+} from "@/lib/youtube/search-server";
 
 type SearchApiOk = {
   ok: true;
@@ -50,12 +62,107 @@ type SearchApiErr = {
   message?: string;
 };
 
+const REFRESH_ORDER_POOL: YoutubeSearchOrder[] = [
+  "relevance",
+  "date",
+  "viewCount",
+  "rating",
+  "title",
+];
+
+/** Biases YouTube search toward a different slice of the catalog on each refresh. */
+function randomPublishedAfterForMix(): string {
+  const start = Date.UTC(2018, 0, 1);
+  const end = Date.now() - 5 * 24 * 60 * 60 * 1000;
+  const u = start + Math.random() * (end - start);
+  return new Date(u).toISOString();
+}
+
+function shuffleArray<T>(items: T[]): T[] {
+  const out = items.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = out[i]!;
+    out[i] = out[j]!;
+    out[j] = t;
+  }
+  return out;
+}
+
+const SHORTS_FILTERS_STORAGE_KEY = "idle-english:shorts-filters:v1";
+
+type ShortsFiltersSnapshot = {
+  themeId: string;
+  channelId: string | null;
+  channelTitle: string | null;
+  searchDraft: string;
+  debouncedSearch: string;
+  durationShort: boolean;
+  manualSortOrder: YoutubeSearchOrder | null;
+};
+
+function isPersistedThemeId(id: unknown): id is string {
+  return typeof id === "string" && SHORTS_THEMES.some((t) => t.id === id);
+}
+
+function readShortsFiltersFromStorage(): ShortsFiltersSnapshot | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SHORTS_FILTERS_STORAGE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Record<string, unknown>;
+    if (p.v !== 1) return null;
+
+    if (!isPersistedThemeId(p.themeId)) return null;
+
+    let channelId: string | null = null;
+    if (typeof p.channelId === "string" && p.channelId.trim()) {
+      channelId = p.channelId.trim();
+    }
+
+    const searchDraft = typeof p.searchDraft === "string" ? p.searchDraft : "";
+    const debouncedSearch =
+      typeof p.debouncedSearch === "string" ? p.debouncedSearch : searchDraft;
+    const durationShort =
+      typeof p.durationShort === "boolean" ? p.durationShort : true;
+
+    let manualSortOrder: YoutubeSearchOrder | null = null;
+    if (
+      typeof p.manualSortOrder === "string" &&
+      isYoutubeSearchOrder(p.manualSortOrder)
+    ) {
+      manualSortOrder = p.manualSortOrder;
+    }
+
+    let channelTitle: string | null =
+      typeof p.channelTitle === "string" ? p.channelTitle : null;
+    if (channelId) {
+      const preset = ENGLISH_LEARNING_CHANNELS.find((c) => c.id === channelId);
+      if (preset) channelTitle = preset.title;
+    }
+
+    return {
+      themeId: p.themeId,
+      channelId,
+      channelTitle,
+      searchDraft,
+      debouncedSearch,
+      durationShort,
+      manualSortOrder,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function buildQuery(opts: {
   theme: ShortsTheme;
   channelId: string | null;
   debouncedSearch: string;
   pageToken?: string;
   durationShort: boolean;
+  sortOrder?: YoutubeSearchOrder | null;
+  mixPublishedAfter?: string | null;
 }) {
   const p = new URLSearchParams();
   if (opts.channelId) {
@@ -75,6 +182,12 @@ function buildQuery(opts: {
   }
   if (!opts.durationShort) {
     p.set("duration", "any");
+  }
+  if (opts.sortOrder) {
+    p.set("order", opts.sortOrder);
+  }
+  if (opts.mixPublishedAfter && !opts.pageToken) {
+    p.set("publishedAfter", opts.mixPublishedAfter);
   }
   return p.toString();
 }
@@ -110,6 +223,26 @@ export function ShortsFeed({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [durationShort, setDurationShort] = useState(true);
 
+  const filterKey = useMemo(
+    () =>
+      `${themeId}\u0000${channelId ?? ""}\u0000${debouncedSearch}\u0000${durationShort}`,
+    [themeId, channelId, debouncedSearch, durationShort],
+  );
+  const [refreshSortKey, setRefreshSortKey] = useState(filterKey);
+  const [manualSortOrder, setManualSortOrder] =
+    useState<YoutubeSearchOrder | null>(null);
+  /** Random floor date for YouTube mix — set on “Refresh”, cleared when filters change; not persisted. */
+  const [mixPublishedAfter, setMixPublishedAfter] = useState<string | null>(
+    null,
+  );
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+
+  if (filterKey !== refreshSortKey) {
+    setRefreshSortKey(filterKey);
+    setManualSortOrder(null);
+    setMixPublishedAfter(null);
+  }
+
   const [videos, setVideos] = useState<YoutubeSearchVideo[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
@@ -130,9 +263,55 @@ export function ShortsFeed({
   });
 
   useEffect(() => {
+    const saved = readShortsFiltersFromStorage();
+    if (saved) {
+      const fk = `${saved.themeId}\u0000${saved.channelId ?? ""}\u0000${saved.debouncedSearch}\u0000${saved.durationShort}`;
+      setThemeId(saved.themeId);
+      setChannelId(saved.channelId);
+      setChannelTitle(saved.channelTitle);
+      setSearchDraft(saved.searchDraft);
+      setDebouncedSearch(saved.debouncedSearch);
+      setDurationShort(saved.durationShort);
+      setManualSortOrder(saved.manualSortOrder);
+      setRefreshSortKey(fk);
+    }
+    setFiltersHydrated(true);
+  }, []);
+
+  useEffect(() => {
     const t = window.setTimeout(() => setDebouncedSearch(searchDraft), 380);
     return () => window.clearTimeout(t);
   }, [searchDraft]);
+
+  useEffect(() => {
+    if (!filtersHydrated) return;
+    try {
+      window.localStorage.setItem(
+        SHORTS_FILTERS_STORAGE_KEY,
+        JSON.stringify({
+          v: 1,
+          themeId,
+          channelId,
+          channelTitle,
+          searchDraft,
+          debouncedSearch,
+          durationShort,
+          manualSortOrder,
+        }),
+      );
+    } catch {
+      /* quota / private mode */
+    }
+  }, [
+    filtersHydrated,
+    themeId,
+    channelId,
+    channelTitle,
+    searchDraft,
+    debouncedSearch,
+    durationShort,
+    manualSortOrder,
+  ]);
 
   const fetchPage = useCallback(
     async (pageToken: string | undefined, append: boolean) => {
@@ -142,6 +321,8 @@ export function ShortsFeed({
         debouncedSearch,
         pageToken,
         durationShort,
+        sortOrder: manualSortOrder,
+        mixPublishedAfter,
       });
       abortRef.current?.abort();
       const ac = new AbortController();
@@ -155,10 +336,11 @@ export function ShortsFeed({
 
       if (!res.ok || !data.ok) {
         const err = data as SearchApiErr;
-        if (err.error === "missing_key") {
-          setConfigError(err.message ?? "Missing YouTube API key.");
+        if (err.error === "missing_key" || err.error === "youtube_quota") {
+          setConfigError(err.message ?? "YouTube API unavailable.");
         } else {
-          toast.error(err.message ?? "Couldn’t load videos.");
+          const raw = err.message ?? "Couldn’t load videos.";
+          toast.error(raw.replace(/<[^>]*>/g, "").trim() || "Couldn’t load videos.");
         }
         if (!append) setVideos([]);
         setNextPageToken(undefined);
@@ -167,11 +349,15 @@ export function ShortsFeed({
 
       setConfigError(null);
       const payload = data as SearchApiOk;
+      const nextItems =
+        !append && mixPublishedAfter
+          ? shuffleArray(payload.items)
+          : payload.items;
       setVideos((prev) => {
-        if (!append) return payload.items;
+        if (!append) return nextItems;
         const seen = new Set(prev.map((v) => v.videoId));
         const merged = [...prev];
-        for (const v of payload.items) {
+        for (const v of nextItems) {
           if (!seen.has(v.videoId)) {
             seen.add(v.videoId);
             merged.push(v);
@@ -181,10 +367,28 @@ export function ShortsFeed({
       });
       setNextPageToken(payload.nextPageToken);
     },
-    [theme, channelId, debouncedSearch, durationShort],
+    [
+      theme,
+      channelId,
+      debouncedSearch,
+      durationShort,
+      manualSortOrder,
+      mixPublishedAfter,
+    ],
   );
 
+  const refreshFeed = useCallback(() => {
+    setMixPublishedAfter(randomPublishedAfterForMix());
+    const pool = REFRESH_ORDER_POOL.filter((o) => o !== manualSortOrder);
+    const next =
+      pool[Math.floor(Math.random() * pool.length)] ?? REFRESH_ORDER_POOL[0];
+    setManualSortOrder(next);
+    setActiveIndex(0);
+    scrollRef.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [manualSortOrder]);
+
   useEffect(() => {
+    if (!filtersHydrated) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -198,7 +402,7 @@ export function ShortsFeed({
     return () => {
       cancelled = true;
     };
-  }, [fetchPage]);
+  }, [fetchPage, filtersHydrated]);
 
   const loadMore = useCallback(async () => {
     if (!nextPageToken || loadingMoreRef.current) return;
@@ -335,6 +539,18 @@ export function ShortsFeed({
           >
             <Radio className="size-3.5" />
             Channels
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="size-9 shrink-0"
+            disabled={loading || Boolean(configError)}
+            onClick={refreshFeed}
+            title="Random mix — new time window, sort, and order"
+            aria-label="Load a random new batch of shorts"
+          >
+            <RefreshCw className="size-4" aria-hidden />
           </Button>
         </div>
 

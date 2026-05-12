@@ -1,5 +1,18 @@
 import { isYoutubeConfigured } from "@/lib/env";
-import { searchYoutubeVideos } from "@/lib/youtube/search-server";
+import {
+  isYoutubeSearchOrder,
+  searchYoutubeVideos,
+} from "@/lib/youtube/search-server";
+
+function parsePublishedAfterParam(raw: string | null): string | undefined {
+  if (!raw?.trim()) return undefined;
+  const s = raw.trim();
+  if (s.length > 36) return undefined;
+  const t = Date.parse(s);
+  if (Number.isNaN(t)) return undefined;
+  if (t < Date.UTC(2005, 0, 1) || t > Date.now() + 60_000) return undefined;
+  return new Date(t).toISOString();
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -31,6 +44,14 @@ export async function GET(request: Request) {
       ? rawDuration
       : undefined;
 
+  const rawOrder = searchParams.get("order")?.trim();
+  const order =
+    rawOrder && isYoutubeSearchOrder(rawOrder) ? rawOrder : undefined;
+
+  const publishedAfter = parsePublishedAfterParam(
+    searchParams.get("publishedAfter"),
+  );
+
   const apiKey = process.env.YOUTUBE_API_KEY!.trim();
   const result = await searchYoutubeVideos({
     apiKey,
@@ -39,15 +60,21 @@ export async function GET(request: Request) {
     categoryKey: category,
     pageToken,
     videoDuration,
+    order,
+    publishedAfter,
   });
 
   if (!result.ok) {
+    const message =
+      result.error === "youtube_quota"
+        ? "YouTube Data API quota for this key is exhausted (search.list costs 100 units per call on the free tier). Quota resets daily, or create another API key in a Google Cloud project and set YOUTUBE_API_KEY in .env.local. Check usage: Google Cloud Console → APIs & Services → YouTube Data API v3 → Quotas."
+        : (result.details ?? "YouTube API failed.");
     return Response.json(
       {
         ok: false as const,
         error: result.error,
-        message: result.details ?? "YouTube API failed.",
-        items: [],
+        message,
+        items: [] as [],
         nextPageToken: undefined as undefined,
       },
       { status: 502 },

@@ -19,6 +19,15 @@ type YoutubeSearchListResponse = {
   error?: { code?: number; message?: string };
 };
 
+function stripHtmlTags(s: string): string {
+  return s.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
+
+function isQuotaExceededMessage(msg: string): boolean {
+  const m = msg.toLowerCase();
+  return m.includes("quota") && (m.includes("exceed") || m.includes("exceeded"));
+}
+
 function pickThumb(snippet: NonNullable<YoutubeSearchListResponse["items"]>[0]["snippet"]) {
   return (
     snippet?.thumbnails?.high?.url ??
@@ -26,6 +35,20 @@ function pickThumb(snippet: NonNullable<YoutubeSearchListResponse["items"]>[0]["
     snippet?.thumbnails?.default?.url ??
     ""
   );
+}
+
+const YOUTUBE_SEARCH_ORDERS = [
+  "date",
+  "rating",
+  "relevance",
+  "title",
+  "viewCount",
+] as const;
+
+export type YoutubeSearchOrder = (typeof YOUTUBE_SEARCH_ORDERS)[number];
+
+export function isYoutubeSearchOrder(v: string): v is YoutubeSearchOrder {
+  return (YOUTUBE_SEARCH_ORDERS as readonly string[]).includes(v);
 }
 
 export async function searchYoutubeVideos(input: {
@@ -36,9 +59,17 @@ export async function searchYoutubeVideos(input: {
   pageToken?: string;
   /** Prefer clips under ~4 minutes (YouTube Data API “short” bucket). */
   videoDuration?: "short" | "medium" | "long" | "any";
+  /** When omitted, channel searches default to `date`, else `relevance`. */
+  order?: YoutubeSearchOrder;
+  /** RFC 3339 — only videos published at or after this instant (search.list). */
+  publishedAfter?: string;
 }): Promise<
   | { ok: true; items: YoutubeSearchVideo[]; nextPageToken?: string }
-  | { ok: false; error: string; details?: string }
+  | {
+      ok: false;
+      error: "network" | "youtube_api" | "youtube_quota";
+      details?: string;
+    }
 > {
   const url = new URL("https://www.googleapis.com/youtube/v3/search");
   url.searchParams.set("part", "snippet");
@@ -55,9 +86,14 @@ export async function searchYoutubeVideos(input: {
     url.searchParams.set("videoDuration", vd);
   }
 
+  const defaultOrder: YoutubeSearchOrder = input.channelId?.trim()
+    ? "date"
+    : "relevance";
+  const order = input.order ?? defaultOrder;
+  url.searchParams.set("order", order);
+
   if (input.channelId?.trim()) {
     url.searchParams.set("channelId", input.channelId.trim());
-    url.searchParams.set("order", "date");
   } else {
     let q: string;
     if (input.q?.trim()) {
@@ -71,11 +107,15 @@ export async function searchYoutubeVideos(input: {
       q = YOUTUBE_CATEGORY_QUERIES.explore.q;
     }
     url.searchParams.set("q", q);
-    url.searchParams.set("order", "relevance");
   }
 
   if (input.pageToken) {
     url.searchParams.set("pageToken", input.pageToken);
+  }
+
+  const pa = input.publishedAfter?.trim();
+  if (pa) {
+    url.searchParams.set("publishedAfter", pa);
   }
 
   let res: Response;
@@ -88,11 +128,13 @@ export async function searchYoutubeVideos(input: {
   const json = (await res.json()) as YoutubeSearchListResponse;
 
   if (!res.ok || json.error) {
-    const msg = json.error?.message ?? res.statusText ?? "YouTube API error";
+    const raw = json.error?.message ?? res.statusText ?? "YouTube API error";
+    const clean = stripHtmlTags(raw);
+    const quota = isQuotaExceededMessage(clean) || isQuotaExceededMessage(raw);
     return {
       ok: false,
-      error: "youtube_api",
-      details: msg,
+      error: quota ? "youtube_quota" : "youtube_api",
+      details: clean,
     };
   }
 
