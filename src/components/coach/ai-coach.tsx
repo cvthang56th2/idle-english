@@ -4,6 +4,7 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -41,7 +42,6 @@ import type {
   StoredCoachMsg,
 } from "@/lib/coach-chat-storage";
 import {
-  COACH_THREADS_MAX,
   createCoachThread,
   deriveThreadTitle,
   loadCoachPersisted,
@@ -140,9 +140,12 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
   const ttsSeqRef = useRef(0);
 
   const threadsRef = useRef(threads);
-  threadsRef.current = threads;
   const activeThreadIdRef = useRef(activeThreadId);
-  activeThreadIdRef.current = activeThreadId;
+
+  useLayoutEffect(() => {
+    threadsRef.current = threads;
+    activeThreadIdRef.current = activeThreadId;
+  });
 
   const activeThread = useMemo(
     () => threads.find((t) => t.id === activeThreadId),
@@ -155,16 +158,18 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
   );
 
   useEffect(() => {
-    const levelGuess = readStoredLevel() ?? "intermediate";
-    const local = loadCoachPersisted();
-    const merged = mergeCoachBundles(local, coachRemote.bundle, levelGuess);
-    setThreads(merged.threads);
-    setActiveThreadId(merged.activeThreadId);
-    prefetchSpeechVoices();
-    setAutoReadAloud(readCoachPrefBool(LS_AUTO_READ, true));
-    setSttLang(readCoachLocale(LS_STT_LANG, "en-US"));
-    setTtsLang(readCoachLocale(LS_TTS_LANG, "en-US"));
-    setHydrated(true);
+    queueMicrotask(() => {
+      const levelGuess = readStoredLevel() ?? "intermediate";
+      const local = loadCoachPersisted();
+      const merged = mergeCoachBundles(local, coachRemote.bundle, levelGuess);
+      setThreads(merged.threads);
+      setActiveThreadId(merged.activeThreadId);
+      prefetchSpeechVoices();
+      setAutoReadAloud(readCoachPrefBool(LS_AUTO_READ, true));
+      setSttLang(readCoachLocale(LS_STT_LANG, "en-US"));
+      setTtsLang(readCoachLocale(LS_TTS_LANG, "en-US"));
+      setHydrated(true);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial snapshot from server + localStorage once
   }, []);
 
@@ -201,8 +206,10 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     if (busy && listening) {
       recognitionRef.current?.stop();
       recognitionRef.current = null;
-      setListening(false);
-      setInterimVoice("");
+      queueMicrotask(() => {
+        setListening(false);
+        setInterimVoice("");
+      });
     }
   }, [busy, listening]);
 
@@ -389,7 +396,10 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
   const topicId = activeThread?.topicId ?? "small_talk";
   const customTopic = activeThread?.customTopic ?? "";
   const level = activeThread?.level ?? "intermediate";
-  const messages: StoredCoachMsg[] = activeThread?.messages ?? [];
+  const messages = useMemo(
+    (): StoredCoachMsg[] => activeThread?.messages ?? [],
+    [activeThread],
+  );
   const draft = activeThread?.draft ?? "";
 
   const startersScopeKey = useMemo(
@@ -706,7 +716,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 pb-2 pt-1">
       <div className="flex shrink-0 flex-col gap-2">
         <div className="-mx-1 flex max-h-[92px] min-h-0 flex-col gap-1 overflow-hidden">
-          <div className="flex gap-2 items-center overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex gap-2 items-center overflow-x-auto pb-1 [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden">
             <Button
               type="button"
               variant="outline"
@@ -773,7 +783,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
 
       {topicLevelOpen ? (
         <>
-          <ScrollArea className="min-w-0 w-full shrink-0 [-ms-overflow-style:none] [scrollbar-width:none] [&>[data-slot=scroll-area-scrollbar]]:hidden">
+          <ScrollArea className="min-w-0 w-full shrink-0 [-ms-overflow-style:none] scrollbar-none *:data-[slot=scroll-area-scrollbar]:hidden">
             <div className="flex w-max max-w-none flex-nowrap gap-2 pb-1">
               {COACH_TOPICS.map((t) => (
                 <button
