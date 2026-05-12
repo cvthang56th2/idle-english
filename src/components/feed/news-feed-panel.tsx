@@ -102,8 +102,8 @@ export function NewsFeedPanel() {
           const n = Object.keys(data.failures).length;
           setFailHints(
             n === 1
-              ? "One source timed out."
-              : `${n} sources could not refresh.`,
+              ? "One feed could not refresh."
+              : `${n} feeds could not refresh.`,
           );
         }
       } catch {
@@ -169,7 +169,7 @@ export function NewsFeedPanel() {
         <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Newspaper className="size-3.5 shrink-0 text-primary" aria-hidden />
           <span className="truncate">
-            Sources in Profile · open to read · save for offline list
+            Free RSS feeds · open to read · save for your list
           </span>
         </p>
         <Button
@@ -202,7 +202,7 @@ export function NewsFeedPanel() {
         <div className="mx-4 mt-6 rounded-2xl border border-dashed border-border/70 bg-muted/20 p-6 text-center">
           <p className="font-medium">No stories yet</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Enable sources under Profile → News reading, then tap Refresh above.
+            Enable sources under Profile → News sources, then tap Refresh above.
           </p>
           <Button
             type="button"

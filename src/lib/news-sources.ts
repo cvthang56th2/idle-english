@@ -1,4 +1,4 @@
-/** Curated English-learning oriented RSS feeds (server-fetchable without auth). */
+/** Free public RSS feeds for developer reading (no API keys). */
 
 export type NewsSourceDef = {
   id: string;
@@ -7,32 +7,24 @@ export type NewsSourceDef = {
   feedUrl: string;
 };
 
-/** Ids-only list for iterating / validation. Enable all by default via preferences layer. */
 export const NEWS_SOURCES: NewsSourceDef[] = [
   {
-    id: "cambridge-about-words",
-    label: "Cambridge Dictionary blog",
-    hint: "Short vocabulary and usage notes.",
-    feedUrl: "https://dictionaryblog.cambridge.org/feed/",
+    id: "dev-to-feed",
+    label: "DEV Community",
+    hint: "Posts from the dev.to community — tutorials and discussion.",
+    feedUrl: "https://dev.to/feed",
   },
   {
-    id: "guardian-education",
-    label: "The Guardian · Education",
-    hint: "School and learning stories in plain English.",
-    feedUrl:
-      "https://www.theguardian.com/education/rss",
+    id: "hackernews-front",
+    label: "Hacker News",
+    hint: "Front page links via hnrss — tech and startups.",
+    feedUrl: "https://hnrss.org/frontpage",
   },
   {
-    id: "bbc-world",
-    label: "BBC News · World",
-    hint: "Global headlines — good for skim reading.",
-    feedUrl: "https://feeds.bbci.co.uk/news/world/rss.xml",
-  },
-  {
-    id: "npr-top",
-    label: "NPR · News headlines",
-    hint: "US public radio summaries — conversational tone.",
-    feedUrl: "https://www.npr.org/rss/rss.php?id=1001",
+    id: "freecodecamp-news",
+    label: "freeCodeCamp News",
+    hint: "Long-form guides and learning articles.",
+    feedUrl: "https://www.freecodecamp.org/news/rss/",
   },
 ];
 

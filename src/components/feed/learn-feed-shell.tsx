@@ -14,7 +14,7 @@ export function LearnFeedShell({
 }: {
   initialSavedIds: string[];
 }) {
-  const [tab, setTab] = useState<LearnTab>("cards");
+  const [tab, setTab] = useState<LearnTab>("news");
   /** Remount swipe feed when returning from News so Cards opens with a freshly fetched deck. */
   const [cardsFeedKey, setCardsFeedKey] = useState(0);
 
@@ -36,23 +36,6 @@ export function LearnFeedShell({
           <button
             type="button"
             role="tab"
-            id="learn-tab-cards"
-            aria-selected={tab === "cards"}
-            aria-controls="learn-panel-cards"
-            tabIndex={tab === "cards" ? 0 : -1}
-            className={cn(
-              "min-h-9 flex-1 rounded-md px-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-              tab === "cards"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => selectTab("cards")}
-          >
-            Cards
-          </button>
-          <button
-            type="button"
-            role="tab"
             id="learn-tab-news"
             aria-selected={tab === "news"}
             aria-controls="learn-panel-news"
@@ -67,7 +50,36 @@ export function LearnFeedShell({
           >
             News
           </button>
+          <button
+            type="button"
+            role="tab"
+            id="learn-tab-cards"
+            aria-selected={tab === "cards"}
+            aria-controls="learn-panel-cards"
+            tabIndex={tab === "cards" ? 0 : -1}
+            className={cn(
+              "min-h-9 flex-1 rounded-md px-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              tab === "cards"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => selectTab("cards")}
+          >
+            Cards
+          </button>
         </div>
+      </div>
+
+      <div
+        id="learn-panel-news"
+        role="tabpanel"
+        aria-labelledby="learn-tab-news"
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden",
+          tab !== "news" && "hidden",
+        )}
+      >
+        <NewsFeedPanel />
       </div>
 
       <div
@@ -83,18 +95,6 @@ export function LearnFeedShell({
           key={cardsFeedKey}
           initialSavedIds={initialSavedIds}
         />
-      </div>
-
-      <div
-        id="learn-panel-news"
-        role="tabpanel"
-        aria-labelledby="learn-tab-news"
-        className={cn(
-          "flex min-h-0 flex-1 flex-col overflow-hidden",
-          tab !== "news" && "hidden",
-        )}
-      >
-        <NewsFeedPanel />
       </div>
     </>
   );

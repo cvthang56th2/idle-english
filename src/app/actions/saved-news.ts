@@ -30,7 +30,7 @@ export async function toggleSavedNews(
   if (!titleTrim || titleTrim.length > 512) {
     return { ok: false as const, error: "invalid_title" as const };
   }
-  if (!NEWS_SOURCE_IDS.has(snapshot.sourceId)) {
+  if (saved && !NEWS_SOURCE_IDS.has(snapshot.sourceId)) {
     return { ok: false as const, error: "invalid_source" as const };
   }
 

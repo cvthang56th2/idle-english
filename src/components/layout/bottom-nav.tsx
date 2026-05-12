@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Bookmark,
   Clapperboard,
-  Home,
+  Newspaper,
   MessageCircle,
   UserRound,
 } from "lucide-react";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/coach", label: "Coach", icon: MessageCircle },
-  { href: "/feed", label: "Learn", icon: Home },
+  { href: "/feed", label: "Feed", icon: Newspaper },
   { href: "/shorts", label: "Shorts", icon: Clapperboard },
   { href: "/saved", label: "Saved", icon: Bookmark },
   { href: "/profile", label: "Profile", icon: UserRound },

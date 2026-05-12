@@ -55,7 +55,7 @@ export function toggleNewsSourceInPrefs(sourceId: string, enabled: boolean) {
   const set = new Set(cur);
   if (enabled) set.add(sourceId);
   else set.delete(sourceId);
-  let ids = [...set];
+  const ids = [...set];
   if (!ids.length) return false;
 
   ids.sort((a, b) => NEWS_SOURCES.findIndex((s) => s.id === a) -

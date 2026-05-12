@@ -37,8 +37,8 @@ export function NewsReadingSettings() {
       </p>
       <p className="mt-2 text-lg font-semibold leading-snug">News sources</p>
       <p className="mt-2 text-sm text-muted-foreground">
-        Tick which RSS feeds appear in Feed → News. Articles open in your
-        browser; saves sync when you use a cloud profile.
+        Choose which free RSS feeds appear in Feed → News. No API keys required.
+        Articles open in your browser; saves sync when you use a cloud profile.
       </p>
       <ul className="mt-5 flex flex-col gap-4">
         {NEWS_SOURCES.map((src) => {
@@ -56,7 +56,7 @@ export function NewsReadingSettings() {
                     const nextWant = !on;
                     const ok = toggleNewsSourceInPrefs(src.id, nextWant);
                     if (!ok) {
-                      toast.message("Keep at least one English source.");
+                      toast.message("Keep at least one source enabled.");
                       return;
                     }
                     setEnabledIds([...readNewsPreferences().enabledIds]);
