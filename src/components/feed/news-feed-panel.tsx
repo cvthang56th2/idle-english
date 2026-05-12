@@ -297,7 +297,6 @@ export function NewsFeedPanel() {
                       <div className="mt-2 flex flex-wrap gap-2">
                         <a
                           href={a.link}
-                          target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
                             buttonVariants({ variant: "outline", size: "sm" }),

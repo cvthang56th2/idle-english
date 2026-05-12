@@ -118,7 +118,6 @@ function SavedShortRow({
         <div className="mt-2 flex flex-wrap gap-2">
           <a
             href={watchUrl}
-            target="_blank"
             rel="noopener noreferrer"
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),

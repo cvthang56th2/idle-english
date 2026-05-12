@@ -103,7 +103,6 @@ export function SavedNewsLibrary({
                   <div className="flex flex-wrap gap-2">
                     <a
                       href={e.articleUrl}
-                      target="_blank"
                       rel="noopener noreferrer"
                       className={cn(
                         buttonVariants({ variant: "outline", size: "sm" }),
