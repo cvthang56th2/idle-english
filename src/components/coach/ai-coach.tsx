@@ -475,6 +475,8 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
           corrections?: StoredCoachCorrection[];
           suggestions?: string[];
           error?: string;
+          detail?: string;
+          upstreamStatus?: number;
           fallback?: {
             reply: string;
             corrections: StoredCoachCorrection[];
@@ -511,7 +513,12 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
               );
             }
           } else {
-            toast.error("Could not reach the coach. Try again.");
+            const hint = data.detail?.trim();
+            toast.error(
+              hint
+                ? `Coach request failed (${data.upstreamStatus ?? res.status}): ${hint.slice(0, 280)}${hint.length > 280 ? "…" : ""}`
+                : "Could not reach the coach. Try again.",
+            );
             setThreads((prev) =>
               prev.map((t) =>
                 t.id !== tid

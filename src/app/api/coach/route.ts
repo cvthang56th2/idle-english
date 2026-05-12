@@ -148,11 +148,37 @@ export async function POST(request: Request) {
       response_format: { type: "json_object" },
     });
 
+    const rawBody = await res.text();
+
     if (!res.ok) {
-      return Response.json({ error: "upstream_error" }, { status: 502 });
+      let detail: string | undefined;
+      try {
+        const parsed = JSON.parse(rawBody) as {
+          error?: { message?: string };
+        };
+        const msg = parsed?.error?.message;
+        if (typeof msg === "string" && msg.trim()) {
+          detail = msg.trim().slice(0, 800);
+        }
+      } catch {
+        /* non-JSON error body */
+      }
+      return Response.json(
+        {
+          error: "upstream_error",
+          upstreamStatus: res.status,
+          ...(detail ? { detail } : {}),
+        },
+        { status: 502 },
+      );
     }
 
-    const data = await res.json();
+    let data: unknown;
+    try {
+      data = JSON.parse(rawBody) as unknown;
+    } catch {
+      return Response.json({ error: "invalid_upstream_json" }, { status: 502 });
+    }
     const raw = chatCompletionAssistantText(data)?.trim();
     if (!raw) {
       return Response.json({ error: "empty_model" }, { status: 502 });
