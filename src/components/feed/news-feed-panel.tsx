@@ -4,6 +4,7 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -25,8 +26,10 @@ import {
   type IdleSavedNewsChangedDetail,
 } from "@/lib/saved-news-storage";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+
+const INITIAL_VISIBLE = 12;
+const PAGE_SIZE = 12;
 
 export type FeedNewsArticle = ParsedFeedItem & {
   sourceId: string;
@@ -41,10 +44,22 @@ export function NewsFeedPanel() {
       ? `?sources=${encodeURIComponent(prefs.enabledIds.join(","))}`
       : "";
 
-  const [items, setItems] = useState<FeedNewsArticle[]>([]);
+  const [allItems, setAllItems] = useState<FeedNewsArticle[]>([]);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const [loading, setLoading] = useState(true);
   const [failHints, setFailHints] = useState<string | null>(null);
   const [, startFetch] = useTransition();
+
+  const scrollRootRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const allItemsLenRef = useRef(0);
+
+  const items = allItems.slice(0, visibleCount);
+  const hasMore = visibleCount < allItems.length;
+
+  useEffect(() => {
+    allItemsLenRef.current = allItems.length;
+  }, [allItems.length]);
 
   useEffect(() => {
     function onPrefs() {
@@ -97,7 +112,9 @@ export function NewsFeedPanel() {
           items: FeedNewsArticle[];
           failures?: Record<string, string>;
         };
-        setItems(data.items ?? []);
+        const next = data.items ?? [];
+        setAllItems(next);
+        setVisibleCount(Math.min(INITIAL_VISIBLE, Math.max(next.length, 0)));
         if (data.failures && Object.keys(data.failures).length > 0) {
           const n = Object.keys(data.failures).length;
           setFailHints(
@@ -107,7 +124,8 @@ export function NewsFeedPanel() {
           );
         }
       } catch {
-        setItems([]);
+        setAllItems([]);
+        setVisibleCount(INITIAL_VISIBLE);
         toast.error("Could not load reading list.");
       } finally {
         setLoading(false);
@@ -118,6 +136,28 @@ export function NewsFeedPanel() {
   useEffect(() => {
     loadNews();
   }, [loadNews]);
+
+  useEffect(() => {
+    if (loading && allItems.length === 0) return;
+    const root = scrollRootRef.current;
+    const target = sentinelRef.current;
+    if (!root || !target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((e) => e.isIntersecting);
+        if (!hit) return;
+        const cap = allItemsLenRef.current;
+        setVisibleCount((v) => {
+          if (v >= cap) return v;
+          return Math.min(v + PAGE_SIZE, cap);
+        });
+      },
+      { root, rootMargin: "280px", threshold: 0 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loading, allItems.length]);
 
   const handleToggleSaved = useCallback((article: FeedNewsArticle) => {
     const canon = canonArticleUrlSafe(article.link);
@@ -193,7 +233,7 @@ export function NewsFeedPanel() {
         </p>
       ) : null}
 
-      {loading && items.length === 0 ? (
+      {loading && allItems.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 pb-24 text-muted-foreground">
           <Loader2 className="size-8 animate-spin" aria-hidden />
           <span className="text-sm">Loading articles…</span>
@@ -214,8 +254,11 @@ export function NewsFeedPanel() {
           </Button>
         </div>
       ) : (
-        <ScrollArea className="min-h-0 flex-1">
-          <ul className="flex flex-col gap-2 px-3 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-3">
+        <div
+          ref={scrollRootRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
+          <ul className="flex flex-col gap-2 px-3 pt-3 pb-2">
             {items.map((a) => {
               const canon = canonArticleUrlSafe(a.link);
               const saved = canon ? savedUrls.has(canon) : false;
@@ -286,7 +329,20 @@ export function NewsFeedPanel() {
               );
             })}
           </ul>
-        </ScrollArea>
+          <div
+            ref={sentinelRef}
+            className="flex min-h-10 shrink-0 flex-col items-center justify-center gap-1 px-3 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-2"
+            role="presentation"
+          >
+            {hasMore ? (
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            ) : allItems.length > INITIAL_VISIBLE ? (
+              <p className="text-center text-[11px] text-muted-foreground">
+                You&apos;re caught up for now.
+              </p>
+            ) : null}
+          </div>
+        </div>
       )}
     </div>
   );

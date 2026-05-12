@@ -4,7 +4,7 @@ import { flattenSourceItems, parseFeedXml } from "@/lib/rss-parse";
 const SOURCE_PARAM = "sources";
 
 /** Cap per feed so merges stay balanced across sources. */
-const MAX_PER_FEED = 16;
+const MAX_PER_FEED = 32;
 
 async function fetchFeedText(url: string): Promise<string> {
   const res = await fetch(url, {
@@ -80,7 +80,7 @@ export async function GET(request: Request) {
 
   return Response.json(
     {
-      items: deduped.slice(0, 80),
+      items: deduped.slice(0, 160),
       failures: Object.keys(failures).length ? failures : undefined,
       fetchedAt: Date.now(),
     },
