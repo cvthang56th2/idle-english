@@ -13,9 +13,9 @@ import {
 import { cn } from "@/lib/utils";
 
 const links = [
+  { href: "/coach", label: "Coach", icon: MessageCircle },
   { href: "/feed", label: "Learn", icon: Home },
   { href: "/shorts", label: "Shorts", icon: Clapperboard },
-  { href: "/coach", label: "Coach", icon: MessageCircle },
   { href: "/saved", label: "Saved", icon: Bookmark },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
@@ -31,7 +31,10 @@ export function BottomNav() {
       <div className="mx-auto flex max-w-lg items-stretch justify-around gap-1 px-2 pt-2">
         {links.map(({ href, label, icon: Icon }) => {
           const active =
-            pathname === href || (href !== "/feed" && pathname.startsWith(href));
+            pathname === href ||
+            (href !== "/feed" &&
+              href !== "/coach" &&
+              pathname.startsWith(href));
           return (
             <Link
               key={href}

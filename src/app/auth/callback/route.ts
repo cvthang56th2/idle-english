@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const next =
     nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
       ? nextRaw
-      : "/feed";
+      : "/coach";
 
   if (!code) {
     return NextResponse.redirect(

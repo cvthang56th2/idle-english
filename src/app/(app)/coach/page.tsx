@@ -14,9 +14,8 @@ export default async function CoachPage() {
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <AppHeader
-        eyebrow="Conversation"
+        eyebrow="IdleEnglish"
         title="AI Coach"
-        detail="Topics · fixes · prompts matched to your level"
         showFeedShortcut
         singleLine
       />

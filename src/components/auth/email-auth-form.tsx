@@ -45,7 +45,7 @@ export function EmailAuthForm() {
           password,
           options: {
             emailRedirectTo:
-              `${origin}/auth/callback?next=${encodeURIComponent("/feed")}`,
+              `${origin}/auth/callback?next=${encodeURIComponent("/coach")}`,
           },
         });
         if (error) {
@@ -53,8 +53,8 @@ export function EmailAuthForm() {
           return;
         }
         if (data.session) {
-          toast.success("Account created — taking you to the feed.");
-          router.push("/feed");
+          toast.success("Account created — opening Coach.");
+          router.push("/coach");
           router.refresh();
           return;
         }
@@ -71,7 +71,7 @@ export function EmailAuthForm() {
         return;
       }
       toast.success("Signed in.");
-      router.push("/feed");
+      router.push("/coach");
       router.refresh();
     } finally {
       setBusy(false);
@@ -148,9 +148,9 @@ export function EmailAuthForm() {
       <p className="text-center text-sm text-muted-foreground">
         <Link
           className="text-primary underline-offset-4 hover:underline"
-          href="/feed"
+          href="/coach"
         >
-          Back to feed
+          Continue without signing in
         </Link>
       </p>
     </form>

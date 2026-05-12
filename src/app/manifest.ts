@@ -2,12 +2,12 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    id: "/feed",
+    id: "/coach",
     name: "IdleEnglish",
     short_name: "IdleEnglish",
     description:
       "Swipe-style micro English lessons for builders waiting on AI and deploys.",
-    start_url: "/feed",
+    start_url: "/coach",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

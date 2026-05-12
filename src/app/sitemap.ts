@@ -8,6 +8,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return paths.map((path) => ({
     url: `${base}${path}`,
     changeFrequency: "weekly",
-    priority: path === "/feed" ? 1 : 0.7,
+    priority: path === "/coach" ? 1 : 0.7,
   }));
 }
