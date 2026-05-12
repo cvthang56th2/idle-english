@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 import { AppHeader } from "@/components/layout/app-header";
@@ -20,7 +20,9 @@ export function PersistentFeedShell({
   const [feedEverOpened, setFeedEverOpened] = useState(() => isFeed);
 
   useEffect(() => {
-    if (isFeed) setFeedEverOpened(true);
+    if (isFeed) {
+      startTransition(() => setFeedEverOpened(true));
+    }
   }, [isFeed]);
 
   return (

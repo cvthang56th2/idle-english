@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { motion } from "framer-motion";
 import {
   Bookmark,
   ChevronRight,
@@ -72,12 +71,11 @@ export function LessonSlide({
   };
 
   return (
-    <motion.article
-      layout
-      initial={{ opacity: 0.9, scale: 0.987 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.55 }}
-      className="relative flex h-full min-h-0 max-h-full flex-col gap-4 rounded-[28px] border border-border/70 bg-linear-to-b from-card/90 to-background/80 p-5 pb-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-white/5 backdrop-blur-md"
+    <article
+      className={cn(
+        "relative flex h-full min-h-0 max-h-full flex-col gap-4 rounded-[28px] border border-border/70 bg-linear-to-b from-card/90 to-background/80 p-5 pb-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-white/5 backdrop-blur-md",
+        "animate-in fade-in zoom-in-95 duration-300 ease-out fill-mode-both",
+      )}
     >
       <div
         className="pointer-events-auto absolute right-3 bottom-20 z-10 flex flex-col items-end gap-2.5"
@@ -152,6 +150,6 @@ export function LessonSlide({
           <LessonCardHeader card={card} className="w-max flex-nowrap" />
         </div>
       </div>
-    </motion.article>
+    </article>
   );
 }

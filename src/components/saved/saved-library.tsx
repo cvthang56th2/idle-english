@@ -128,7 +128,7 @@ export function SavedLibrary({ remoteIds }: { remoteIds: string[] }) {
           </Link>
         </div>
       ) : (
-        <ScrollArea className="min-h-0 flex-1 px-4">
+        <ScrollArea className="px-4">
           <div className="flex flex-col gap-4 pb-8 pt-1">
             {entries.map((entry) => (
               <SavedCard
