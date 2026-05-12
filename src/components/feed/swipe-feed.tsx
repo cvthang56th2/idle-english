@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Layers } from "lucide-react";
+import { Layers, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import type { LessonCard } from "@/types/card";
@@ -20,16 +20,19 @@ import {
 import { LessonSlide } from "@/components/feed/lesson-slide";
 import { GenerateSessionSheet } from "@/components/feed/generate-session-sheet";
 import { FeedSkeleton } from "@/components/feed/feed-skeleton";
+import { LessonCardHeader } from "@/components/feed/lesson-card-content";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
+  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type FeedResponse = {
   items: LessonCard[];
@@ -124,9 +127,16 @@ export function SwipeFeed({
     return () => observer.disconnect();
   }, [fetchPage]);
 
-  const handleExplain = useCallback(async (card: LessonCard) => {
+  const openExplainSheet = useCallback((card: LessonCard) => {
     setExplainTarget(card);
+    setExplainText("");
+    setExplainLoading(false);
     setExplainOpen(true);
+  }, []);
+
+  const runExplain = useCallback(async () => {
+    const card = explainTarget;
+    if (!card) return;
     setExplainLoading(true);
     setExplainText("");
     try {
@@ -140,6 +150,15 @@ export function SwipeFeed({
     } catch {
       setExplainText("We couldn’t reach the AI coach — try again shortly.");
     } finally {
+      setExplainLoading(false);
+    }
+  }, [explainTarget]);
+
+  const handleExplainOpenChange = useCallback((open: boolean) => {
+    setExplainOpen(open);
+    if (!open) {
+      setExplainTarget(null);
+      setExplainText("");
       setExplainLoading(false);
     }
   }, []);
@@ -243,7 +262,7 @@ export function SwipeFeed({
                   card={card}
                   saved={savedIds.has(card.id)}
                   onToggleSave={(next) => updateSaved(card.id, next)}
-                  onExplain={handleExplain}
+                  onExplain={openExplainSheet}
                 />
               </section>
             ))}
@@ -265,29 +284,162 @@ export function SwipeFeed({
             </div>
           </div>
 
-          <Sheet open={explainOpen} onOpenChange={setExplainOpen}>
-            <SheetContent side="bottom" className="h-[70dvh] rounded-t-3xl border-border/80">
-              <SheetHeader>
-                <SheetTitle className="text-left text-2xl">
-                  {explainTarget?.title ?? "AI coach"}
-                </SheetTitle>
-                <SheetDescription className="text-left text-base">
-                  Short breakdown tuned for busy builders.
-                </SheetDescription>
-              </SheetHeader>
-              <ScrollArea className="mt-4 h-[48dvh] pr-3">
-                {explainLoading ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-4 w-full rounded-full" />
-                    <Skeleton className="h-4 w-full rounded-full" />
-                    <Skeleton className="h-4 w-3/4 rounded-full" />
+          <Sheet open={explainOpen} onOpenChange={handleExplainOpenChange}>
+            <SheetContent
+              side="bottom"
+              className="flex h-[min(88dvh,640px)] flex-col gap-0 overflow-hidden rounded-t-3xl border-border/80 px-0 pb-0 pt-0"
+            >
+              <div className="flex flex-1 flex-col gap-0 px-6 pb-4 pt-3">
+                <div
+                  className="mx-auto mb-3 h-1.5 w-10 shrink-0 rounded-full bg-muted-foreground/25"
+                  aria-hidden
+                />
+
+                <SheetHeader className="shrink-0 space-y-4 p-0 text-left">
+                  <div className="flex gap-3">
+                    <div
+                      className={cn(
+                        "flex size-12 shrink-0 items-center justify-center rounded-2xl",
+                        "bg-primary/12 ring-1 ring-primary/20",
+                      )}
+                      aria-hidden
+                    >
+                      <Sparkles className="size-6 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        AI coach
+                      </p>
+                      <SheetTitle className="text-balance text-xl font-semibold leading-snug sm:text-2xl">
+                        {explainTarget?.title ?? "Break it down"}
+                      </SheetTitle>
+                      <SheetDescription className="text-base leading-relaxed">
+                        {explainText
+                          ? explainText.includes("try again shortly")
+                            ? "We couldn’t load this one — you can retry below."
+                            : "Here’s what stood out for this lesson."
+                          : "Plain-English help for this card. Nothing runs until you tap explain."}
+                      </SheetDescription>
+                    </div>
                   </div>
-                ) : (
-                  <p className="whitespace-pre-wrap text-lg leading-relaxed text-muted-foreground">
-                    {explainText}
+
+                  {explainTarget ? (
+                    <div
+                      className={cn(
+                        "rounded-2xl border border-border/80 bg-linear-to-b from-card/70 to-muted/25",
+                        "p-4 shadow-inner shadow-black/5",
+                      )}
+                    >
+                      <LessonCardHeader card={explainTarget} className="px-0" />
+                      <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                        {explainTarget.example}
+                      </p>
+                    </div>
+                  ) : null}
+                </SheetHeader>
+
+                <ScrollArea
+                  className={cn(
+                    "mt-1 min-h-0 flex-1",
+                    !(explainText || explainLoading) && "max-h-[min(32dvh,220px)]",
+                  )}
+                >
+                  <div className="pr-3 pt-2">
+                    {explainLoading ? (
+                      <div className="space-y-4 py-2">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <Loader2
+                            className="size-4 shrink-0 animate-spin text-primary"
+                            aria-hidden
+                          />
+                          <span>Coaching you up…</span>
+                        </div>
+                        <div className="space-y-3 rounded-2xl border border-border/60 bg-muted/20 p-4">
+                          <Skeleton className="h-3.5 w-full rounded-full" />
+                          <Skeleton className="h-3.5 w-[94%] rounded-full" />
+                          <Skeleton className="h-3.5 w-[78%] rounded-full" />
+                          <Skeleton className="h-3.5 w-[88%] rounded-full" />
+                        </div>
+                      </div>
+                    ) : explainText ? (
+                      <div
+                        className={cn(
+                          "rounded-2xl border border-border/70 bg-card/50 p-5 shadow-sm",
+                          explainText.includes("try again shortly") &&
+                            "border-amber-500/35 bg-amber-500/8",
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap text-base leading-relaxed text-foreground/95">
+                          {explainText}
+                        </p>
+                        {!explainText.includes("try again shortly") ? (
+                          <p className="mt-4 text-xs text-muted-foreground">
+                            Tip: close anytime — your streak still counts while
+                            you skim the feed.
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-3 py-6 text-center">
+                        <div className="flex size-14 items-center justify-center rounded-full bg-muted/80 ring-1 ring-border/80">
+                          <Sparkles
+                            className="size-7 text-muted-foreground"
+                            aria-hidden
+                          />
+                        </div>
+                        <p className="max-w-sm text-pretty text-sm leading-relaxed text-muted-foreground">
+                          Ready when you are. One tap sends only this card to
+                          the coach — no background calls.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {!explainLoading && !explainText ? (
+                <SheetFooter className="shrink-0 border-t border-border/70 bg-muted/20 px-6 py-4">
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="w-full rounded-2xl gap-2"
+                    onClick={() => void runExplain()}
+                  >
+                    <Sparkles className="size-4" aria-hidden />
+                    Explain this card
+                  </Button>
+                </SheetFooter>
+              ) : null}
+
+              {explainLoading ? (
+                <SheetFooter className="shrink-0 border-t border-border/70 bg-muted/15 px-6 py-3">
+                  <p className="w-full text-center text-xs text-muted-foreground">
+                    Usually a few seconds
                   </p>
-                )}
-              </ScrollArea>
+                </SheetFooter>
+              ) : null}
+
+              {explainText && !explainLoading ? (
+                <SheetFooter className="shrink-0 gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 sm:flex-row">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-2xl sm:flex-1"
+                    onClick={() => {
+                      setExplainText("");
+                    }}
+                  >
+                    Ask again
+                  </Button>
+                  <Button
+                    type="button"
+                    className="w-full rounded-2xl sm:flex-1"
+                    onClick={() => void runExplain()}
+                  >
+                    Refresh explain
+                  </Button>
+                </SheetFooter>
+              ) : null}
             </SheetContent>
           </Sheet>
         </>

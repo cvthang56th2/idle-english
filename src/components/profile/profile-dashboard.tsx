@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
-import { Cloud, CloudOff, Download, User } from "lucide-react";
+import { Cloud, CloudOff, Download, LogOut, User } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { AuthSyncSummary } from "@/lib/auth-sync";
+import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { readLocalProgress } from "@/lib/offline-cache";
 
 type BeforeInstallPromptEvent = Event & {
@@ -39,7 +43,7 @@ function syncCopy(summary: AuthSyncSummary): {
     case "anonymous":
       return {
         title: "Guest cloud session",
-        body: "XP and saved cards sync to Supabase for this browser session. Link an email in the Supabase dashboard later if you add full auth.",
+        body: "XP and saved cards sync for this browser. Sign in with email to recover progress on another device.",
         icon: Cloud,
       };
     case "signed_in":
@@ -64,8 +68,10 @@ export function ProfileDashboard({
   lastLearnedAt: string | null;
   authSync: AuthSyncSummary;
 }) {
+  const router = useRouter();
   const [installEvent, setInstallEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const [local, setLocal] = useState({ xp: 0, streak: 0 });
 
   useEffect(() => {
@@ -94,6 +100,23 @@ export function ProfileDashboard({
     await installEvent.userChoice;
     setInstallEvent(null);
   }
+
+  async function handleSignOut() {
+    const sb = getSupabaseBrowser();
+    if (!sb || signingOut) return;
+    setSigningOut(true);
+    try {
+      await sb.auth.signOut();
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  const showSignInLink =
+    authSync.state === "anonymous" ||
+    authSync.state === "no_user" ||
+    authSync.state === "no_client";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pb-8">
@@ -134,11 +157,35 @@ export function ProfileDashboard({
           <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary">
             <SyncIcon className="size-5" aria-hidden />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-lg font-semibold leading-snug">{sync.title}</p>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {sync.body}
             </p>
+            {showSignInLink ? (
+              <Link
+                className={cn(
+                  buttonVariants({ size: "lg" }),
+                  "mt-4 flex h-11 w-full rounded-2xl text-base font-semibold",
+                )}
+                href="/login"
+              >
+                Sign in or create account
+              </Link>
+            ) : null}
+            {authSync.state === "signed_in" ? (
+              <Button
+                className="mt-4 h-11 w-full rounded-2xl text-base font-semibold"
+                disabled={signingOut}
+                size="lg"
+                type="button"
+                variant="outline"
+                onClick={() => void handleSignOut()}
+              >
+                <LogOut />
+                {signingOut ? "Signing out…" : "Sign out"}
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>
