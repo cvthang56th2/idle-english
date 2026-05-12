@@ -77,7 +77,7 @@ export function SavedNewsLibrary({
             {entries.map((e) => (
               <li key={e.articleUrl}>
                 <article className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-card/50 p-3 shadow-sm backdrop-blur-sm">
-                  <div>
+                  <a href={e.articleUrl} rel="noopener noreferrer" className="block">
                     <p className="line-clamp-2 text-sm font-medium leading-snug">
                       {e.title}
                     </p>
@@ -99,7 +99,7 @@ export function SavedNewsLibrary({
                         </>
                       ) : null}
                     </p>
-                  </div>
+                  </a>
                   <div className="flex flex-wrap gap-2">
                     <a
                       href={e.articleUrl}

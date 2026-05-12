@@ -274,7 +274,11 @@ export function NewsFeedPanel() {
               return (
                 <li key={`${a.sourceId}:${a.link}`}>
                   <article className="flex gap-2 rounded-2xl border border-border/70 bg-card/50 p-3 shadow-sm backdrop-blur-sm">
-                    <div className="min-w-0 flex-1">
+                    <a
+                      href={a.link}
+                      rel="noopener noreferrer"
+                      className="min-w-0 flex-1 block"
+                    >
                       <p className="line-clamp-2 text-sm font-medium leading-snug">
                         {a.title}
                       </p>
@@ -307,7 +311,7 @@ export function NewsFeedPanel() {
                           Read
                         </a>
                       </div>
-                    </div>
+                    </a>
                     <button
                       type="button"
                       aria-pressed={saved}
