@@ -5,25 +5,39 @@ import { usePathname } from "next/navigation";
 
 import { AppHeader } from "@/components/layout/app-header";
 import { SwipeFeed } from "@/components/feed/swipe-feed";
+import { ShortsFeed } from "@/components/shorts/shorts-feed";
 import { cn } from "@/lib/utils";
+import type { SavedShortSnapshot } from "@/types/saved-short";
 
 export function PersistentFeedShell({
   initialSavedIds,
+  initialRemoteSavedShorts,
   children,
 }: {
   initialSavedIds: string[];
+  initialRemoteSavedShorts: SavedShortSnapshot[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
   const isFeed = pathname === "/feed";
+  const isShorts = pathname === "/shorts";
 
   const [feedEverOpened, setFeedEverOpened] = useState(() => isFeed);
+  const [shortsEverOpened, setShortsEverOpened] = useState(() => isShorts);
 
   useEffect(() => {
     if (isFeed) {
       startTransition(() => setFeedEverOpened(true));
     }
   }, [isFeed]);
+
+  useEffect(() => {
+    if (isShorts) {
+      startTransition(() => setShortsEverOpened(true));
+    }
+  }, [isShorts]);
+
+  const hideRouteChildren = isFeed || isShorts;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -46,12 +60,33 @@ export function PersistentFeedShell({
         </div>
       ) : null}
 
+      {shortsEverOpened ? (
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col overflow-hidden",
+            !isShorts && "hidden",
+          )}
+          aria-hidden={!isShorts}
+        >
+          <AppHeader
+            singleLine
+            eyebrow="IdleEnglish"
+            title="English Shorts"
+            showFeedShortcut
+          />
+          <ShortsFeed
+            initialRemoteSavedShorts={initialRemoteSavedShorts}
+            playbackActive={isShorts}
+          />
+        </div>
+      ) : null}
+
       <div
         className={cn(
           "flex min-h-0 flex-1 flex-col overflow-hidden",
-          isFeed && "hidden",
+          hideRouteChildren && "hidden",
         )}
-        aria-hidden={isFeed}
+        aria-hidden={hideRouteChildren}
       >
         {children}
       </div>

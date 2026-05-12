@@ -96,8 +96,11 @@ function embedUrl(videoId: string) {
 
 export function ShortsFeed({
   initialRemoteSavedShorts,
+  /** When false (e.g. another bottom tab is active), the embed is unmounted so playback stops. */
+  playbackActive = true,
 }: {
   initialRemoteSavedShorts: SavedShortSnapshot[];
+  playbackActive?: boolean;
 }) {
   const [themeId, setThemeId] = useState(DEFAULT_SHORTS_THEME_ID);
   const theme = useMemo(() => getShortsTheme(themeId), [themeId]);
@@ -436,7 +439,7 @@ export function ShortsFeed({
                       />
                     </Button>
                   </div>
-                  {i === activeIndex ? (
+                  {i === activeIndex && playbackActive ? (
                     <iframe
                       title={v.title}
                       src={embedUrl(v.videoId)}
