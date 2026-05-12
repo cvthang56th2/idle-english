@@ -27,6 +27,15 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
+const USER_NOTES_MAX = 500;
+
+function normalizeUserNotes(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const t = raw.replace(/\u0000/g, "").trim();
+  if (!t) return null;
+  return t.slice(0, USER_NOTES_MAX);
+}
+
 type RawItem = {
   type?: unknown;
   title?: unknown;
@@ -297,15 +306,23 @@ async function generateWithOpenAI(
   defaultLevel: LearnerLevel,
   count: number,
   apiKey: string,
+  userNotes: string | null,
 ): Promise<LessonCard[] | null> {
   const focus = selections.map((c) => `- ${c.promptFocus}`).join("\n");
   const tagHints = selections.map((c) => c.id);
+
+  const learnerBlock = userNotes
+    ? `
+Learner-provided context (honor when compatible with category mix; do not invent private facts):
+${userNotes}
+`
+    : "";
 
   const userPrompt = `You create bite-sized spoken English drills for developers.
 
 Categories to blend across the batch:
 ${focus}
-
+${learnerBlock}
 Global constraints:
 - Return JSON only: {"items":[...]}
 - Produce exactly ${count} items.
@@ -397,7 +414,10 @@ export async function POST(request: Request) {
     categoryIds?: unknown;
     level?: unknown;
     count?: unknown;
+    notes?: unknown;
   };
+
+  const userNotes = normalizeUserNotes(b.notes);
 
   if (!Array.isArray(b.categoryIds) || b.categoryIds.length === 0) {
     return Response.json({ error: "category_ids_required" }, { status: 400 });
@@ -425,7 +445,13 @@ export async function POST(request: Request) {
   let items: LessonCard[];
 
   if (apiKey) {
-    const ai = await generateWithOpenAI(selections, defaultLevel, count, apiKey);
+    const ai = await generateWithOpenAI(
+      selections,
+      defaultLevel,
+      count,
+      apiKey,
+      userNotes,
+    );
     items = ai ?? fallbackLessonCards(categoryIds, defaultLevel, count);
   } else {
     items = fallbackLessonCards(categoryIds, defaultLevel, count);

@@ -11,9 +11,15 @@ const typeLabels: Record<LessonCard["type"], string> = {
   pronunciation: "Pronunciation",
 };
 
-export function LessonCardHeader({ card }: { card: LessonCard }) {
+export function LessonCardHeader({
+  card,
+  className,
+}: {
+  card: LessonCard;
+  className?: string;
+}) {
   return (
-    <header className="flex flex-wrap items-center gap-2 px-1">
+    <header className={cn("flex flex-wrap items-center gap-2 px-1", className)}>
       <Badge variant="secondary" className="rounded-full px-3 py-1 text-[11px] uppercase tracking-wide">
         {typeLabels[card.type]}
       </Badge>

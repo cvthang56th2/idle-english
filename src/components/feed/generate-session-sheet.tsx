@@ -19,6 +19,9 @@ import { cn } from "@/lib/utils";
 
 const LS_CATEGORIES = "idle_generate_categories_v1";
 const LS_LEVEL = "idle_generate_level_v1";
+const LS_NOTES = "idle_generate_notes_v1";
+
+const NOTES_MAX = 500;
 
 const LEVELS: LearnerLevel[] = ["beginner", "intermediate", "advanced"];
 
@@ -50,6 +53,17 @@ function readStoredLevel(): LearnerLevel | null {
   return null;
 }
 
+function readStoredNotes(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const v = window.localStorage.getItem(LS_NOTES);
+    if (typeof v !== "string") return "";
+    return v.slice(0, NOTES_MAX);
+  } catch {
+    return "";
+  }
+}
+
 type GenerateSessionSheetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,6 +81,7 @@ export function GenerateSessionSheet({
     return new Set<CardCategoryId>(["fluent_dev_daily", "behavioral_interviews"]);
   });
   const [level, setLevel] = useState<LearnerLevel>(() => readStoredLevel() ?? "intermediate");
+  const [notes, setNotes] = useState<string>(() => readStoredNotes());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -77,6 +92,7 @@ export function GenerateSessionSheet({
       }
       const storedLevel = readStoredLevel();
       if (storedLevel) setLevel(storedLevel);
+      setNotes(readStoredNotes());
     }, 0);
     return () => window.clearTimeout(id);
   }, []);
@@ -89,6 +105,11 @@ export function GenerateSessionSheet({
   const persistLevel = useCallback((next: LearnerLevel) => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(LS_LEVEL, next);
+  }, []);
+
+  const persistNotes = useCallback((next: string) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(LS_NOTES, next.slice(0, NOTES_MAX));
   }, []);
 
   const toggle = useCallback(
@@ -126,6 +147,7 @@ export function GenerateSessionSheet({
           categoryIds: [...selected],
           level,
           count: 6,
+          notes: notes.trim() || undefined,
         }),
         signal: AbortSignal.timeout(45_000),
       });
@@ -151,7 +173,7 @@ export function GenerateSessionSheet({
     } finally {
       setBusy(false);
     }
-  }, [level, onGenerated, onOpenChange, selected]);
+  }, [level, notes, onGenerated, onOpenChange, selected]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -159,7 +181,7 @@ export function GenerateSessionSheet({
         <SheetHeader className="text-left">
           <SheetTitle className="text-2xl">Build a mini session</SheetTitle>
           <SheetDescription className="text-base">
-            Pick focus areas — we prepend fresh cards tuned for interviewing and teamwork.
+            Pick focus areas — add optional notes so the batch can lean your way (AI path).
           </SheetDescription>
         </SheetHeader>
 
@@ -184,6 +206,33 @@ export function GenerateSessionSheet({
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="gen-notes" className="text-sm font-medium">
+              Anything else? <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+            <textarea
+              id="gen-notes"
+              rows={3}
+              maxLength={NOTES_MAX}
+              placeholder="e.g. upcoming Google loop, nervous about small talk, want more STAR examples…"
+              className={cn(
+                "min-h-22 w-full resize-y rounded-2xl border border-border bg-background px-4 py-3 text-base",
+                "placeholder:text-muted-foreground/70",
+                "outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/35",
+              )}
+              value={notes}
+              disabled={busy}
+              onChange={(e) => {
+                const v = e.target.value.slice(0, NOTES_MAX);
+                setNotes(v);
+                persistNotes(v);
+              }}
+            />
+            <p className="text-xs text-muted-foreground">
+              {notes.length}/{NOTES_MAX} · used when <code className="rounded bg-muted px-1">OPENAI_API_KEY</code> is set
+            </p>
           </div>
 
           <div>

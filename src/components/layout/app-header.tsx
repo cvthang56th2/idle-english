@@ -5,14 +5,22 @@ export function AppHeader({
   title,
   detail,
   showFeedShortcut = true,
+  placement = "top",
 }: {
   eyebrow: string;
   title: string;
   detail?: string;
   showFeedShortcut?: boolean;
+  placement?: "top" | "bottom";
 }) {
   return (
-    <header className="space-y-1 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+    <header
+      className={
+        placement === "bottom"
+          ? "space-y-1 border-t border-border/60 px-4 pb-3 pt-3"
+          : "space-y-1 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
+      }
+    >
       <p className="text-[11px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">
         {eyebrow}
       </p>

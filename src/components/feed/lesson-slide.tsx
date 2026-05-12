@@ -1,8 +1,14 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { motion } from "framer-motion";
-import { Bookmark, Sparkles, Volume2 } from "lucide-react";
+import {
+  Bookmark,
+  ChevronRight,
+  EllipsisVertical,
+  Sparkles,
+  Volume2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import type { LessonCard } from "@/types/card";
@@ -45,6 +51,7 @@ export function LessonSlide({
   onExplain,
 }: LessonSlideProps) {
   const [pending, startTransition] = useTransition();
+  const [railOpen, setRailOpen] = useState(true);
 
   const handleSave = () => {
     const next = !saved;
@@ -70,50 +77,80 @@ export function LessonSlide({
       initial={{ opacity: 0.9, scale: 0.987 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: "spring", stiffness: 520, damping: 34, mass: 0.55 }}
-      className="flex h-full min-h-0 max-h-full flex-col gap-4 rounded-[28px] border border-border/70 bg-gradient-to-b from-card/90 to-background/80 p-5 pb-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-white/5 backdrop-blur-md"
+      className="relative flex h-full min-h-0 max-h-full flex-col gap-4 rounded-[28px] border border-border/70 bg-linear-to-b from-card/90 to-background/80 p-5 pb-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] ring-1 ring-white/5 backdrop-blur-md"
     >
-      <LessonCardHeader card={card} />
-      <LessonCardBody card={card} className="min-h-0 overflow-y-auto" />
-      <div className="mt-auto flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="lg"
-            variant={saved ? "default" : "outline"}
-            className={cn(
-              "rounded-2xl px-4",
-              saved &&
+      <div
+        className="pointer-events-auto absolute right-3 bottom-20 z-10 flex flex-col items-end gap-2.5"
+        role="toolbar"
+        aria-label="Card actions"
+      >
+        {railOpen ? (
+          <div
+            id="card-action-rail"
+            className="flex flex-col gap-2.5"
+          >
+            <Button
+              type="button"
+              size="icon-lg"
+              variant={saved ? "default" : "outline"}
+              className={cn(
+                "rounded-full shadow-md",
+                saved &&
                 "bg-primary text-primary-foreground shadow-[0_10px_40px_rgba(34,197,94,0.35)]",
-            )}
-            onClick={handleSave}
-            disabled={pending}
-            aria-pressed={saved}
-          >
-            <Bookmark className={cn("size-4", saved && "fill-current")} />
-            {saved ? "Saved" : "Save"}
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            variant="secondary"
-            className="rounded-2xl px-4"
-            onClick={() => speak(card)}
-          >
-            <Volume2 />
-            Listen
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            variant="ghost"
-            className="rounded-2xl px-4"
-            onClick={() => onExplain(card)}
-          >
-            <Sparkles />
-            AI explain
-          </Button>
+              )}
+              onClick={handleSave}
+              disabled={pending}
+              aria-pressed={saved}
+              aria-label={saved ? "Saved — tap to remove" : "Save"}
+            >
+              <Bookmark className={cn("size-5", saved && "fill-current")} />
+            </Button>
+            <Button
+              type="button"
+              size="icon-lg"
+              variant="secondary"
+              className="rounded-full shadow-md"
+              onClick={() => speak(card)}
+              aria-label="Listen"
+            >
+              <Volume2 className="size-5" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-lg"
+              variant="ghost"
+              className="rounded-full bg-background/80 shadow-md ring-1 ring-border/80 backdrop-blur-sm"
+              onClick={() => onExplain(card)}
+              aria-label="AI explain"
+            >
+              <Sparkles className="size-5" />
+            </Button>
+          </div>
+        ) : null}
+        <Button
+          type="button"
+          size="icon-lg"
+          variant="secondary"
+          className="rounded-full shadow-md"
+          aria-expanded={railOpen}
+          aria-controls="card-action-rail"
+          aria-label={railOpen ? "Hide card actions" : "Show card actions"}
+          onClick={() => setRailOpen((o) => !o)}
+        >
+          {railOpen ? (
+            <ChevronRight className="size-5" aria-hidden />
+          ) : (
+            <EllipsisVertical className="size-5" aria-hidden />
+          )}
+        </Button>
+      </div>
+
+      <LessonCardBody card={card} className="min-h-0 flex-1 overflow-y-auto" />
+
+      <div className="mt-auto min-w-0 flex flex-col gap-3 border-t border-border/60 pt-4">
+        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+          <LessonCardHeader card={card} className="w-max flex-nowrap" />
         </div>
-        <p className="text-[11px] text-muted-foreground">Swipe up for next</p>
       </div>
     </motion.article>
   );

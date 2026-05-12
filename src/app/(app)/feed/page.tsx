@@ -13,6 +13,7 @@ export default async function FeedPage() {
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <AppHeader
+        placement="bottom"
         eyebrow="IdleEnglish"
         title="Learn in the gaps"
         detail="Vertical micro-lessons · swipe up"
