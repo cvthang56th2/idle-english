@@ -823,19 +823,36 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
               Your topic{" "}
               <span className="font-normal opacity-80">(optional, any language)</span>
             </span>
-            <textarea
-              value={customTopic}
-              onChange={(e) =>
-                patchActiveThread({
-                  customTopic: e.target.value.slice(0, CUSTOM_TOPIC_MAX),
-                })
-              }
-              disabled={busy}
-              rows={2}
-              maxLength={CUSTOM_TOPIC_MAX}
-              placeholder="e.g. đàm phán lương · onboarding small talk · RFC feedback…"
-              className="border-input placeholder:text-muted-foreground rounded-xl border bg-muted/20 px-3 py-2 text-sm leading-snug outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
-            />
+            <div className="flex gap-1 items-center">
+              <textarea
+                value={customTopic}
+                onChange={(e) =>
+                  patchActiveThread({
+                    customTopic: e.target.value.slice(0, CUSTOM_TOPIC_MAX),
+                  })
+                }
+                disabled={busy}
+                rows={2}
+                maxLength={CUSTOM_TOPIC_MAX}
+                placeholder="e.g. đàm phán lương · onboarding small talk · RFC feedback…"
+                className="border-input placeholder:text-muted-foreground rounded-xl border bg-muted/20 px-3 py-2 text-sm leading-snug outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50 flex-1"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="shrink-0"
+                disabled={busy || customTopic.trim().length === 0}
+                onClick={() => {
+                  const t = customTopic.trim().slice(0, CUSTOM_TOPIC_MAX);
+                  void sendPayload(
+                    `I'd like to practice: ${t}. What's one good way to start?`,
+                  );
+                }}
+              >
+                <SendHorizontal className="size-3.5" aria-hidden />
+              </Button>
+            </div>
           </label>
 
           <div className="flex shrink-0 gap-1 rounded-xl border border-border bg-muted/30 p-1">
