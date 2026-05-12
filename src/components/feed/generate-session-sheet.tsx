@@ -231,7 +231,7 @@ export function GenerateSessionSheet({
               }}
             />
             <p className="text-xs text-muted-foreground">
-              {notes.length}/{NOTES_MAX} · used when <code className="rounded bg-muted px-1">OPENAI_API_KEY</code> is set
+              {notes.length}/{NOTES_MAX} · used when the server has an AI key configured (OpenAI, Groq, etc.).
             </p>
           </div>
 
@@ -289,9 +289,8 @@ export function GenerateSessionSheet({
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            Hand-tuned starters work without keys;{" "}
-            <code className="rounded bg-muted px-1">OPENAI_API_KEY</code> unlocks fuller blends on the
-            server.
+            Hand-tuned starters work without keys; configure <code className="rounded bg-muted px-1">AI_PROVIDER</code>{" "}
+            and the matching API key on the server for fuller blends.
           </p>
         </div>
       </SheetContent>

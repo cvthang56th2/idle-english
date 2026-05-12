@@ -6,6 +6,11 @@ import {
   isCardCategoryId,
 } from "@/data/card-categories";
 import type { CardType, LearnerLevel, LessonCard } from "@/types/card";
+import {
+  chatCompletionAssistantText,
+  postChatCompletion,
+  resolveServerLlm,
+} from "@/lib/server-llm";
 import { parseCardContent } from "@/types/card";
 
 const CARD_TYPES: CardType[] = [
@@ -301,11 +306,11 @@ function fallbackLessonCards(
   return out;
 }
 
-async function generateWithOpenAI(
+async function generateLessonCardsWithLlm(
+  llm: NonNullable<ReturnType<typeof resolveServerLlm>>,
   selections: typeof CARD_CATEGORIES,
   defaultLevel: LearnerLevel,
   count: number,
-  apiKey: string,
   userNotes: string | null,
 ): Promise<LessonCard[] | null> {
   const focus = selections.map((c) => `- ${c.promptFocus}`).join("\n");
@@ -344,36 +349,26 @@ Global constraints:
 
 Default learner level fallback: ${defaultLevel}.`;
 
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You output terse JSON packs for mobile micro-lessons — factually sober, witty only when slang cards demand it.",
-        },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.55,
-      response_format: { type: "json_object" },
-    }),
+  const res = await postChatCompletion(llm, {
+    messages: [
+      {
+        role: "system",
+        content:
+          "You output terse JSON packs for mobile micro-lessons — factually sober, witty only when slang cards demand it.",
+      },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.55,
+    response_format: { type: "json_object" },
   });
 
   if (!res.ok) return null;
 
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string | null } }[];
-  };
+  const data = await res.json();
 
   let parsed: unknown;
   try {
-    const text = data.choices?.[0]?.message?.content ?? "";
+    const text = chatCompletionAssistantText(data) ?? "";
     parsed = JSON.parse(text) as unknown;
   } catch {
     return null;
@@ -440,16 +435,16 @@ export async function POST(request: Request) {
 
   const selections = CARD_CATEGORIES.filter((c) => categoryIds.includes(c.id));
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const llm = resolveServerLlm();
 
   let items: LessonCard[];
 
-  if (apiKey) {
-    const ai = await generateWithOpenAI(
+  if (llm) {
+    const ai = await generateLessonCardsWithLlm(
+      llm,
       selections,
       defaultLevel,
       count,
-      apiKey,
       userNotes,
     );
     items = ai ?? fallbackLessonCards(categoryIds, defaultLevel, count);

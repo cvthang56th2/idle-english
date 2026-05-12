@@ -1,5 +1,11 @@
 import type { CoachTopicId } from "@/data/coach-topics";
 import { COACH_TOPICS } from "@/data/coach-topics";
+import {
+  chatCompletionAssistantText,
+  describeMissingLlmEnv,
+  postChatCompletion,
+  resolveServerLlm,
+} from "@/lib/server-llm";
 import type { LearnerLevel } from "@/types/card";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -54,14 +60,13 @@ function parseCoachPayload(raw: string): CoachModelPayload | null {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  const llm = resolveServerLlm();
+  if (!llm) {
     return Response.json(
       {
         error: "no_api_key",
         fallback: {
-          reply:
-            "Add `OPENAI_API_KEY` to your environment to chat with the AI coach. Until then, try writing one English sentence about your day and read it aloud twice.",
+          reply: `${describeMissingLlmEnv()} Until then, try writing one English sentence about your day and read it aloud twice.`,
           corrections: [],
           suggestions: [
             "Describe your last code review in one English sentence.",
@@ -131,34 +136,24 @@ export async function POST(request: Request) {
   ].join("\n");
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: system },
-          ...trimmedHistory.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        ],
-        temperature: 0.55,
-        response_format: { type: "json_object" },
-      }),
+    const res = await postChatCompletion(llm, {
+      messages: [
+        { role: "system", content: system },
+        ...trimmedHistory.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      ],
+      temperature: 0.55,
+      response_format: { type: "json_object" },
     });
 
     if (!res.ok) {
       return Response.json({ error: "upstream_error" }, { status: 502 });
     }
 
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const raw = data.choices?.[0]?.message?.content?.trim();
+    const data = await res.json();
+    const raw = chatCompletionAssistantText(data)?.trim();
     if (!raw) {
       return Response.json({ error: "empty_model" }, { status: 502 });
     }

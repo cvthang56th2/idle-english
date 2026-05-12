@@ -735,7 +735,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
       ) : null}
 
       <ScrollArea className="min-h-0 flex-1 rounded-xl border border-border/80 bg-muted/15">
-        <div className="flex flex-col gap-3 p-3 pb-24">
+        <div className="flex flex-col gap-3 p-3">
           {messages.length === 0 ? (
             <div className="space-y-3">
               <p className="text-muted-foreground text-sm leading-relaxed">

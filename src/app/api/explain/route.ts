@@ -1,3 +1,8 @@
+import {
+  chatCompletionAssistantText,
+  postChatCompletion,
+  resolveServerLlm,
+} from "@/lib/server-llm";
 import type { LessonCard } from "@/types/card";
 
 function summarizeCard(card: LessonCard): string {
@@ -39,8 +44,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "missing_card" }, { status: 400 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
+  const llm = resolveServerLlm();
+  if (!llm) {
     return Response.json({ text: fallbackExplain(card) });
   }
 
@@ -53,31 +58,21 @@ Explanation (authoritative): ${card.explanation}
 Example: ${card.example}
 JSON content: ${JSON.stringify(card.content)}`;
 
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "Be concise and encouraging." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.4,
-      }),
+    const res = await postChatCompletion(llm, {
+      messages: [
+        { role: "system", content: "Be concise and encouraging." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.4,
     });
 
     if (!res.ok) {
       return Response.json({ text: fallbackExplain(card) });
     }
 
-    const data = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
+    const data = await res.json();
     const text =
-      data.choices?.[0]?.message?.content?.trim() || fallbackExplain(card);
+      chatCompletionAssistantText(data)?.trim() || fallbackExplain(card);
     return Response.json({ text });
   } catch {
     return Response.json({ text: fallbackExplain(card) });
