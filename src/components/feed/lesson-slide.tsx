@@ -18,7 +18,9 @@ import {
 } from "@/components/feed/lesson-card-content";
 import { toggleSaved } from "@/app/actions/saved";
 import { removeSavedEntry, upsertSavedEntry } from "@/lib/saved-storage";
+import { voiceUriForSpeakLang } from "@/lib/speech-voice-preferences-storage";
 import { cn } from "@/lib/utils";
+import { speakText } from "@/lib/web-speech";
 
 type LessonSlideProps = {
   card: LessonCard;
@@ -36,11 +38,9 @@ function speak(card: LessonCard) {
     });
     return;
   }
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(card.example);
-  utter.lang = "en-US";
-  utter.rate = 0.95;
-  window.speechSynthesis.speak(utter);
+  speakText(card.example, "en-US", {
+    voiceUri: voiceUriForSpeakLang("en-US"),
+  });
 }
 
 export function LessonSlide({

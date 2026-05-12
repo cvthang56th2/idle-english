@@ -8,6 +8,7 @@ import { Cloud, CloudOff, Download, LogOut, User } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NewsReadingSettings } from "@/components/profile/news-reading-settings";
+import { SpeechVoiceSettings } from "@/components/profile/speech-voice-settings";
 import type { AuthSyncSummary } from "@/lib/auth-sync";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { SHOW_STREAK_UI, SHOW_XP_UI } from "@/lib/feature-flags";
@@ -218,6 +219,8 @@ export function ProfileDashboard({
       </section>
 
       <NewsReadingSettings />
+
+      <SpeechVoiceSettings />
 
       <section className="rounded-[26px] border border-dashed border-primary/40 bg-primary/5 p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -48,6 +48,7 @@ import {
   saveCoachPersisted,
   trimThreads,
 } from "@/lib/coach-chat-storage";
+import { voiceUriForSpeakLang } from "@/lib/speech-voice-preferences-storage";
 import type { BrowserSpeechLocale } from "@/lib/web-speech";
 import {
   prefetchSpeechVoices,
@@ -300,6 +301,7 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
       const seq = ++ttsSeqRef.current;
       setTtsSourceKey(sourceKey);
       speakText(content, ttsLang, {
+        voiceUri: voiceUriForSpeakLang(ttsLang),
         onEnd: () => {
           if (ttsSeqRef.current !== seq) return;
           setTtsSourceKey(null);

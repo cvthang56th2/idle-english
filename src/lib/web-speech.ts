@@ -95,17 +95,34 @@ function pickVoice(lang: BrowserSpeechLocale): SpeechSynthesisVoice | null {
   );
 }
 
+function resolveVoice(
+  lang: BrowserSpeechLocale,
+  preferredVoiceUri: string | null | undefined,
+): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices();
+  if (preferredVoiceUri) {
+    const chosen = voices.find((v) => v.voiceURI === preferredVoiceUri);
+    if (chosen) return chosen;
+  }
+  return pickVoice(lang);
+}
+
 export type SpeakHandlers = {
   onStart?: () => void;
   onEnd?: () => void;
   onError?: () => void;
 };
 
+export type SpeakTextOptions = SpeakHandlers & {
+  /** When set and still available in the browser, used instead of locale default */
+  voiceUri?: string | null;
+};
+
 /** Cancels any in-flight utterance before speaking */
 export function speakText(
   text: string,
   lang: BrowserSpeechLocale,
-  handlers?: SpeakHandlers,
+  options?: SpeakTextOptions,
 ): void {
   if (!speechSynthesisSupported()) return;
   const plain = textForSpeech(text);
@@ -115,12 +132,12 @@ export function speakText(
   const u = new SpeechSynthesisUtterance(plain);
   u.lang = lang;
   u.rate = 0.92;
-  const voice = pickVoice(lang);
+  const voice = resolveVoice(lang, options?.voiceUri);
   if (voice) u.voice = voice;
 
-  u.onstart = () => handlers?.onStart?.();
-  u.onend = () => handlers?.onEnd?.();
-  u.onerror = () => handlers?.onError?.();
+  u.onstart = () => options?.onStart?.();
+  u.onend = () => options?.onEnd?.();
+  u.onerror = () => options?.onError?.();
 
   window.speechSynthesis.speak(u);
 }
