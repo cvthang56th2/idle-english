@@ -16,6 +16,7 @@ import {
   Mic,
   MicOff,
   Plus,
+  RefreshCw,
   SendHorizontal,
   Square,
   Volume2,
@@ -127,6 +128,11 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
   const [ttsLang, setTtsLang] = useState<BrowserSpeechLocale>("en-US");
   const [listening, setListening] = useState(false);
   const [interimVoice, setInterimVoice] = useState("");
+  const [aiStartersOverride, setAiStartersOverride] = useState<{
+    scopeKey: string;
+    starters: string[];
+  } | null>(null);
+  const [startersRefreshing, setStartersRefreshing] = useState(false);
   const [ttsSourceKey, setTtsSourceKey] = useState<string | null>(null);
   const [topicLevelOpen, setTopicLevelOpen] = useState(true);
   const endRef = useRef<HTMLDivElement>(null);
@@ -386,6 +392,12 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
   const messages: StoredCoachMsg[] = activeThread?.messages ?? [];
   const draft = activeThread?.draft ?? "";
 
+  const startersScopeKey = useMemo(
+    () =>
+      `${activeThreadId}|${topicId}|${level}|${customTopic.trim().slice(0, CUSTOM_TOPIC_MAX)}`,
+    [activeThreadId, topicId, level, customTopic],
+  );
+
   const starters = useMemo(() => {
     const custom = customTopic.trim();
     if (custom.length > 0) {
@@ -393,6 +405,11 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     }
     return startersFor(topicId, level);
   }, [topicId, level, customTopic]);
+
+  const displayStarters =
+    aiStartersOverride?.scopeKey === startersScopeKey
+      ? aiStartersOverride.starters
+      : starters;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -575,6 +592,84 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
     [busy, autoReadAloud, speakCoachReply, stopCoachSpeech],
   );
 
+  const refreshSuggestedOpens = useCallback(async () => {
+    if (busy || startersRefreshing) return;
+    const tid = activeThreadIdRef.current;
+    const snap = threadsRef.current.find((t) => t.id === tid);
+    if (!snap || snap.messages.length > 0) return;
+
+    const ct = snap.customTopic.trim().slice(0, CUSTOM_TOPIC_MAX);
+    const scopeKey = `${snap.id}|${snap.topicId}|${snap.level}|${ct}`;
+    const baseStarters =
+      ct.length > 0
+        ? startersForCustom(snap.level)
+        : startersFor(snap.topicId, snap.level);
+    const exclude =
+      aiStartersOverride?.scopeKey === scopeKey
+        ? aiStartersOverride.starters
+        : baseStarters;
+
+    setStartersRefreshing(true);
+    try {
+      const res = await fetch("/api/coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          generateSuggestedOpens: true,
+          topicId: snap.topicId,
+          level: snap.level,
+          ...(ct ? { customTopic: ct } : {}),
+          excludeStarters: exclude,
+        }),
+      });
+
+      const data = (await res.json()) as {
+        starters?: string[];
+        error?: string;
+        detail?: string;
+        upstreamStatus?: number;
+        fallback?: { starters?: string[] };
+      };
+
+      if (!res.ok) {
+        const fb = data.fallback?.starters?.filter(
+          (s) => typeof s === "string" && s.trim(),
+        );
+        if (fb && fb.length >= 2) {
+          setAiStartersOverride({
+            scopeKey,
+            starters: fb.slice(0, 3),
+          });
+          toast.message("Coach offline — showing rotated preset prompts.");
+          return;
+        }
+        const hint = data.detail?.trim();
+        toast.error(
+          hint
+            ? `Couldn't refresh suggestions (${data.upstreamStatus ?? res.status}): ${hint.slice(0, 220)}${hint.length > 220 ? "…" : ""}`
+            : "Couldn't refresh suggestions. Try again.",
+        );
+        return;
+      }
+
+      const next = (data.starters ?? []).filter(
+        (s) => typeof s === "string" && s.trim(),
+      );
+      if (next.length >= 2) {
+        setAiStartersOverride({
+          scopeKey,
+          starters: next.slice(0, 3),
+        });
+      } else {
+        toast.error("Got an empty suggestion list. Try again.");
+      }
+    } catch {
+      toast.error("Network error.");
+    } finally {
+      setStartersRefreshing(false);
+    }
+  }, [busy, startersRefreshing, aiStartersOverride]);
+
   const setDraft = useCallback(
     (next: string | ((prev: string) => string)) => {
       patchActiveThread((t) => ({
@@ -748,15 +843,33 @@ export function AiCoach({ coachRemote }: { coachRemote: CoachRemoteState }) {
                 coach reply. Switch chats anytime — history stays on this device.
               </p>
               <div className="flex flex-col gap-2">
-                <p className="text-muted-foreground text-xs font-medium uppercase">
-                  Suggested opens
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-muted-foreground text-xs font-medium uppercase">
+                    Suggested opens
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    disabled={busy || startersRefreshing}
+                    onClick={() => void refreshSuggestedOpens()}
+                    className="text-muted-foreground hover:text-foreground shrink-0 gap-1"
+                    aria-busy={startersRefreshing}
+                  >
+                    {startersRefreshing ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <RefreshCw className="size-3.5" aria-hidden />
+                    )}
+                    More ideas
+                  </Button>
+                </div>
                 <div className="flex flex-col gap-2">
-                  {starters.map((s) => (
+                  {displayStarters.map((s, i) => (
                     <button
-                      key={s}
+                      key={`starter-${i}-${s.slice(0, 48)}`}
                       type="button"
-                      disabled={busy}
+                      disabled={busy || startersRefreshing}
                       onClick={() => void sendPayload(s)}
                       className="rounded-xl border border-border bg-background px-3 py-2 text-left text-sm leading-snug hover:bg-muted/80 disabled:opacity-50"
                     >

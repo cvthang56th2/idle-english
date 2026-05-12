@@ -1,5 +1,9 @@
 import type { CoachTopicId } from "@/data/coach-topics";
-import { COACH_TOPICS } from "@/data/coach-topics";
+import {
+  COACH_TOPICS,
+  startersFor,
+  startersForCustom,
+} from "@/data/coach-topics";
 import {
   chatCompletionAssistantText,
   describeMissingLlmEnv,
@@ -44,6 +48,35 @@ function topicBlock(topicId: CoachTopicId, customTopic: string | null): string {
   return `${preset}\n\nLearner-defined topic (prioritize steering dialogue toward this): ${safe}`;
 }
 
+function shuffleCopy<T>(arr: readonly T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j]!, a[i]!];
+  }
+  return a;
+}
+
+function parseSuggestedOpensPayload(raw: string): string[] | null {
+  try {
+    const parsed = JSON.parse(raw.trim()) as { starters?: unknown };
+    if (!Array.isArray(parsed.starters)) return null;
+    const items = parsed.starters
+      .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+      .map((s) => s.trim().slice(0, 400));
+    const seen = new Set<string>();
+    const uniq = items.filter((s) => {
+      const key = s.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return uniq.length >= 2 ? uniq.slice(0, 3) : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseCoachPayload(raw: string): CoachModelPayload | null {
   const trimmed = raw.trim();
   try {
@@ -60,6 +93,140 @@ function parseCoachPayload(raw: string): CoachModelPayload | null {
 }
 
 export async function POST(request: Request) {
+  let body: {
+    topicId?: CoachTopicId;
+    level?: LearnerLevel;
+    messages?: ChatMessage[];
+    customTopic?: string | null;
+    generateSuggestedOpens?: boolean;
+    excludeStarters?: unknown;
+  };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return Response.json({ error: "invalid_json" }, { status: 400 });
+  }
+
+  const topicId = body.topicId;
+  const level = body.level;
+  const messages = body.messages;
+  let customTopic: string | null = null;
+  if (typeof body.customTopic === "string") {
+    const t = body.customTopic.trim().slice(0, CUSTOM_TOPIC_MAX);
+    customTopic = t.length > 0 ? t : null;
+  }
+
+  let excludeStarters: string[] = [];
+  if (Array.isArray(body.excludeStarters)) {
+    excludeStarters = body.excludeStarters
+      .filter((s): s is string => typeof s === "string")
+      .map((s) => s.trim().slice(0, 400))
+      .filter(Boolean)
+      .slice(0, 24);
+  }
+
+  if (body.generateSuggestedOpens === true) {
+    if (
+      !topicId ||
+      !COACH_TOPICS.some((t) => t.id === topicId) ||
+      !level ||
+      !["beginner", "intermediate", "advanced"].includes(level)
+    ) {
+      return Response.json({ error: "invalid_body" }, { status: 400 });
+    }
+
+    const llm = resolveServerLlm();
+    const presetStarters =
+      customTopic !== null
+        ? startersForCustom(level)
+        : startersFor(topicId, level);
+    if (!llm) {
+      return Response.json(
+        {
+          error: "no_api_key",
+          fallback: {
+            starters: shuffleCopy(presetStarters).slice(0, 3),
+          },
+        },
+        { status: 503 },
+      );
+    }
+
+    const excludeHint =
+      excludeStarters.length > 0
+        ? `\nDo not repeat or closely paraphrase any of these (offer fresh angles):\n${excludeStarters.map((s, i) => `${i + 1}. ${s}`).join("\n")}`
+        : "";
+
+    const system = [
+      "You are IdleEnglish's AI coach helper.",
+      topicBlock(topicId, customTopic),
+      levelInstructions(level),
+      `Suggest exactly 3 short English opener prompts the learner can tap to begin chatting — practical, specific to the scenario, one sentence each or two short clauses max.`,
+      excludeHint,
+      `Respond as ONE JSON object only (no markdown fences): {"starters":["...","...","..."]}`,
+    ].join("\n");
+
+    try {
+      const res = await postChatCompletion(llm, {
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content:
+              "Generate 3 distinct suggested openers now (JSON object only).",
+          },
+        ],
+        temperature: 0.82,
+        response_format: { type: "json_object" },
+      });
+
+      const rawBody = await res.text();
+
+      if (!res.ok) {
+        let detail: string | undefined;
+        try {
+          const parsed = JSON.parse(rawBody) as {
+            error?: { message?: string };
+          };
+          const msg = parsed?.error?.message;
+          if (typeof msg === "string" && msg.trim()) {
+            detail = msg.trim().slice(0, 800);
+          }
+        } catch {
+          /* non-JSON error body */
+        }
+        return Response.json(
+          {
+            error: "upstream_error",
+            upstreamStatus: res.status,
+            ...(detail ? { detail } : {}),
+          },
+          { status: 502 },
+        );
+      }
+
+      let data: unknown;
+      try {
+        data = JSON.parse(rawBody) as unknown;
+      } catch {
+        return Response.json({ error: "invalid_upstream_json" }, { status: 502 });
+      }
+      const raw = chatCompletionAssistantText(data)?.trim();
+      if (!raw) {
+        return Response.json({ error: "empty_model" }, { status: 502 });
+      }
+
+      const starters = parseSuggestedOpensPayload(raw);
+      if (!starters) {
+        return Response.json({ error: "bad_payload", raw }, { status: 502 });
+      }
+
+      return Response.json({ starters });
+    } catch {
+      return Response.json({ error: "exception" }, { status: 500 });
+    }
+  }
+
   const llm = resolveServerLlm();
   if (!llm) {
     return Response.json(
@@ -76,27 +243,6 @@ export async function POST(request: Request) {
       },
       { status: 503 },
     );
-  }
-
-  let body: {
-    topicId?: CoachTopicId;
-    level?: LearnerLevel;
-    messages?: ChatMessage[];
-    customTopic?: string | null;
-  };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return Response.json({ error: "invalid_json" }, { status: 400 });
-  }
-
-  const topicId = body.topicId;
-  const level = body.level;
-  const messages = body.messages;
-  let customTopic: string | null = null;
-  if (typeof body.customTopic === "string") {
-    const t = body.customTopic.trim().slice(0, CUSTOM_TOPIC_MAX);
-    customTopic = t.length > 0 ? t : null;
   }
 
   if (
