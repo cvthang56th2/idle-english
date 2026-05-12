@@ -36,7 +36,7 @@ export function PersistentFeedShell({
           aria-hidden={!isFeed}
         >
           <AppHeader
-            placement="bottom"
+            singleLine
             eyebrow="IdleEnglish"
             title="Learn in the gaps"
             detail="Vertical micro-lessons · swipe up"

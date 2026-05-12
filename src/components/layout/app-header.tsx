@@ -7,6 +7,8 @@ export function AppHeader({
   showFeedShortcut = true,
   placement = "top",
   compact = false,
+  /** One short row + minimal padding to maximize content below. */
+  singleLine = false,
 }: {
   eyebrow: string;
   title: string;
@@ -15,7 +17,33 @@ export function AppHeader({
   placement?: "top" | "bottom";
   /** Tighter typography and padding — for immersive surfaces like Shorts. */
   compact?: boolean;
+  singleLine?: boolean;
 }) {
+  if (singleLine) {
+    return (
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3 py-1 pt-[max(0.25rem,env(safe-area-inset-top))] pb-1.5">
+        <h1 className="min-w-0 truncate text-xs font-semibold leading-tight tracking-tight text-foreground">
+          <span className="font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+            {eyebrow}
+          </span>
+          <span className="mx-1.5 font-normal text-muted-foreground/60">
+            ·
+          </span>
+          <span className="font-semibold">{title}</span>
+        </h1>
+        {detail ? <span className="sr-only">{detail}</span> : null}
+        {showFeedShortcut ? (
+          <Link
+            href="/feed"
+            className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            Feed
+          </Link>
+        ) : null}
+      </header>
+    );
+  }
+
   return (
     <header
       className={

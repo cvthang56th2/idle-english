@@ -13,9 +13,9 @@ export default async function ShortsPage() {
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <AppHeader
-        eyebrow="YouTube"
+        singleLine
+        eyebrow="IdleEnglish"
         title="English Shorts"
-        compact
         showFeedShortcut
       />
       <ShortsFeed initialRemoteSavedShorts={remoteSavedShorts} />
